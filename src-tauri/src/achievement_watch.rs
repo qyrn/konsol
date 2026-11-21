@@ -101,12 +101,16 @@ fn notify(game: &Game, achievement: &Achievement, icons_dir: &Path) {
         body.push('\n');
         body.push_str(&achievement.description);
     }
+    send_notification(&achievement.name, &body, &icon);
+}
+
+pub fn send_notification(title: &str, body: &str, icon: &str) {
     let _ = Command::new("notify-send")
         .arg("--app-name=Konsol")
         .arg(format!("--icon={icon}"))
         .arg("--expire-time=8000")
-        .arg(&achievement.name)
-        .arg(escape_markup(&body))
+        .arg(title)
+        .arg(escape_markup(body))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
