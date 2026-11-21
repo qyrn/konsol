@@ -1,6 +1,8 @@
+use crate::metadata::ApiKeys;
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::io::ErrorKind;
+use std::fs::{self, OpenOptions};
+use std::io::{ErrorKind, Write};
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -8,6 +10,17 @@ use std::path::PathBuf;
 pub struct KonsolConfig {
     pub manual_games: Vec<ManualGame>,
     pub hidden_game_ids: Vec<String>,
+    pub steam_grid_db_api_key: Option<String>,
+    pub steam_web_api_key: Option<String>,
+}
+
+impl KonsolConfig {
+    pub fn api_keys(&self) -> ApiKeys {
+        ApiKeys {
+            steam_grid_db: self.steam_grid_db_api_key.clone(),
+            steam_web: self.steam_web_api_key.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -44,7 +57,13 @@ impl ConfigStore {
         let content = serde_json::to_string_pretty(config)
             .map_err(|error| format!("Impossible d'écrire la config : {error}"))?;
         let temporary_path = self.path.with_extension("json.tmp");
-        fs::write(&temporary_path, content)
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&temporary_path)
+            .and_then(|mut file| file.write_all(content.as_bytes()))
             .and_then(|()| fs::rename(&temporary_path, &self.path))
             .map_err(|error| format!("Impossible d'écrire la config : {error}"))
     }

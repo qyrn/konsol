@@ -25,7 +25,8 @@
         "enable": true,
         "scope": [
           "$HOME/.local/share/Steam/appcache/librarycache/**",
-          "$HOME/.config/heroic/images-cache/**"
+          "$HOME/.config/heroic/images-cache/**",
+          "$APPCACHE/images/**"
         ]
       }
     }

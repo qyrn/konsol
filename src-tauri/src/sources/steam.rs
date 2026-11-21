@@ -1,4 +1,4 @@
-use crate::game::{Game, GameSource, ImageSource, LaunchTarget, ProcessMarker};
+use crate::game::{AchievementSource, Game, GameSource, ImageSource, LaunchTarget, ProcessMarker};
 use crate::vdf::{self, VdfValue};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -87,12 +87,16 @@ fn game_from_manifest(manifest: &Path, steam_root: &Path, home: &Path) -> Option
         cover,
         accent: None,
         hidden: false,
+        achievements: None,
         launch: LaunchTarget::SteamApp(app_id.to_string()),
         process_marker: ProcessMarker::EnvVar {
             name: "SteamAppId",
             value: app_id.to_string(),
         },
         icon_source,
+        achievement_source: Some(AchievementSource::Steam {
+            app_id: app_id.to_string(),
+        }),
     })
 }
 

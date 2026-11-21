@@ -1,4 +1,4 @@
-use crate::game::{Game, GameSource, ImageSource, LaunchTarget, ProcessMarker};
+use crate::game::{AchievementSource, Game, GameSource, ImageSource, LaunchTarget, ProcessMarker};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -81,6 +81,12 @@ fn scan_store(heroic_dir: &Path, store: &Store) -> Vec<Game> {
                 hero,
                 accent: None,
                 hidden: false,
+                achievements: None,
+                achievement_source: (store.source == GameSource::Gog).then(|| {
+                    AchievementSource::Gog {
+                        app_name: installed.app_name.clone(),
+                    }
+                }),
                 launch: LaunchTarget::Heroic {
                     runner: store.runner,
                     app_name: installed.app_name,

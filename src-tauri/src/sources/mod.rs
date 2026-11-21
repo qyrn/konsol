@@ -1,9 +1,9 @@
+mod desktop;
 mod heroic;
-mod scripts;
 mod steam;
 
 use crate::config::KonsolConfig;
-use crate::game::{Game, GameSource};
+use crate::game::{Game, GameSource, LaunchTarget};
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -12,7 +12,7 @@ pub fn scan_all(home: &Path, config: &KonsolConfig) -> Vec<Game> {
     let mut games: Vec<Game> = steam::scan(home)
         .into_iter()
         .chain(heroic::scan(home))
-        .chain(scripts::scan(home))
+        .chain(desktop::scan(home))
         .chain(manual_games(config))
         .collect();
     for game in &mut games {
@@ -24,11 +24,11 @@ pub fn scan_all(home: &Path, config: &KonsolConfig) -> Vec<Game> {
 
 fn manual_games(config: &KonsolConfig) -> impl Iterator<Item = Game> + '_ {
     config.manual_games.iter().map(|manual| {
-        Game::program(
+        Game::launched_by_konsol(
             manual.id.clone(),
             manual.title.clone(),
             GameSource::Manual,
-            manual.executable.clone(),
+            LaunchTarget::Program(manual.executable.clone()),
         )
     })
 }
