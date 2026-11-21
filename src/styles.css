@@ -395,7 +395,9 @@ button:disabled {
   z-index: 10;
   display: grid;
   place-items: center;
-  background: rgb(5 6 12 / 0.55);
+  background: rgb(5 6 12 / 0.72);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }
 
 .add-form {
@@ -405,7 +407,7 @@ button:disabled {
   width: min(34rem, calc(100vw - 48px));
   padding: 28px;
   border-radius: 26px;
-  background: rgb(20 24 40 / 0.55);
+  background: rgb(16 19 32 / 0.94);
 }
 
 .add-form h2 {
@@ -459,7 +461,7 @@ button:disabled {
   max-width: 28rem;
   padding: 0.7rem 1.2rem;
   border-radius: 999px;
-  background: rgb(20 24 40 / 0.6);
+  background: rgb(16 19 32 / 0.88);
   transform: translateX(-50%);
   font-weight: 500;
 }
@@ -515,7 +517,7 @@ button:disabled {
   max-height: calc(100vh - 64px);
   padding: 26px;
   border-radius: 26px;
-  background: rgb(20 24 40 / 0.6);
+  background: rgb(16 19 32 / 0.94);
 }
 
 .achievements-header {
