@@ -79,6 +79,7 @@ fn start_enrichment(app: &AppHandle, games: Vec<Game>, keys: ApiKeys) {
             let _ = app.emit(LIBRARY_EVENT, ());
             return;
         }
+        load_catalog(&app, &agent, &games);
         let (snapshot, images_dir) = {
             let store = lock(&state.metadata);
             (store.snapshot(), store.images_dir().to_path_buf())
@@ -101,12 +102,28 @@ fn start_enrichment(app: &AppHandle, games: Vec<Game>, keys: ApiKeys) {
                 let _ = app.emit(LIBRARY_EVENT, ());
             }
         }
-        let changed = lock(&state.metadata).merge(updates);
-        state.enriching.store(false, Ordering::SeqCst);
-        if changed {
+        if lock(&state.metadata).merge(updates) {
             let _ = app.emit(LIBRARY_EVENT, ());
         }
+        load_catalog(&app, &agent, &games);
+        state.enriching.store(false, Ordering::SeqCst);
     });
+}
+
+fn load_catalog(app: &AppHandle, agent: &ureq::Agent, games: &[Game]) {
+    let state = app.state::<AppState>();
+    let (requests, snapshot) = {
+        let store = lock(&state.metadata);
+        (metadata::catalog_requests(games, &store), store.snapshot())
+    };
+    if requests.is_empty() {
+        return;
+    }
+    for updates in metadata::fetch_catalog(agent, &requests, &snapshot) {
+        if lock(&state.metadata).merge(updates) {
+            let _ = app.emit(LIBRARY_EVENT, ());
+        }
+    }
 }
 
 fn refresh_steam_library(state: &AppState, agent: &ureq::Agent, keys: &ApiKeys) -> bool {

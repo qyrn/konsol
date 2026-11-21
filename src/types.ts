@@ -15,6 +15,11 @@ export interface Game {
   details: GameDetails;
 }
 
+export interface TagWeight {
+  name: string;
+  weight: number;
+}
+
 export interface GameDetails {
   playtimeMinutes: number | null;
   lastPlayed: number | null;
@@ -22,7 +27,7 @@ export interface GameDetails {
   developer: string | null;
   year: number | null;
   genre: string | null;
-  genres: string[];
+  tags: TagWeight[];
   location: string | null;
 }
 

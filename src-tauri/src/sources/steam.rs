@@ -232,10 +232,26 @@ fn game_from_manifest(
     })
 }
 
+const SIDE_BUILD_MARKERS: [&str; 9] = [
+    "test server",
+    "staging branch",
+    "public test",
+    "playtest",
+    "dedicated server",
+    "experimental server",
+    " pts",
+    " sdk",
+    "benchmark",
+];
+
 fn is_steam_tool(name: &str) -> bool {
+    let lowercase = name.to_lowercase();
     TOOL_NAME_PREFIXES
         .iter()
         .any(|prefix| name.starts_with(prefix))
+        || SIDE_BUILD_MARKERS
+            .iter()
+            .any(|marker| lowercase.contains(marker))
 }
 
 fn find_art(cache: &Path, app_id: &str, file_name: &str) -> Option<ImageSource> {
@@ -290,5 +306,11 @@ mod tests {
         assert!(is_steam_tool("Steam Linux Runtime 3.0 (sniper)"));
         assert!(is_steam_tool("Steamworks Common Redistributables"));
         assert!(!is_steam_tool("The Binding of Isaac: Rebirth"));
+        assert!(is_steam_tool(
+            "Tom Clancy's Rainbow Six Siege - Test Server"
+        ));
+        assert!(is_steam_tool("Rust - Staging Branch"));
+        assert!(is_steam_tool("Contraband Police Playtest"));
+        assert!(!is_steam_tool("Football Manager 26"));
     }
 }

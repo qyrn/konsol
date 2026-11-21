@@ -11,7 +11,7 @@ export { EmptyShelf } from "../components/EmptyShelf";
 export { GameDetail } from "../components/GameDetail";
 export { KonsolRoot } from "../components/KonsolRoot";
 export { LaunchButton } from "../components/LaunchButton";
-export { LibraryShelves } from "../components/LibraryShelves";
+export { Library } from "../components/Library";
 export { NowPlaying } from "../components/NowPlaying";
 export { type SessionIndicator, TopBar } from "../components/TopBar";
 export type { LaunchStatus } from "../launchStatus";

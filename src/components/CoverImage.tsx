@@ -25,6 +25,7 @@ export function CoverImage({ game }: { game: Game }) {
       src={source}
       alt=""
       loading="lazy"
+      decoding="async"
       draggable={false}
       onError={() => setFailedSource(source)}
     />

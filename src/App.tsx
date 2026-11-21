@@ -16,7 +16,7 @@ import { CommandPalette } from "./components/CommandPalette";
 import { CoverCarousel } from "./components/CoverCarousel";
 import { EmptyShelf } from "./components/EmptyShelf";
 import { GameDetail } from "./components/GameDetail";
-import { LibraryShelves } from "./components/LibraryShelves";
+import { Library } from "./components/Library";
 import { NowPlaying } from "./components/NowPlaying";
 import { RenameForm } from "./components/RenameForm";
 import { SettingsPage } from "./components/SettingsPage";
@@ -28,6 +28,7 @@ import type { LaunchStatus } from "./launchStatus";
 import type { Game } from "./types";
 import { useLibrary } from "./useLibrary";
 import { usePreferences } from "./usePreferences";
+import { useStableCallback } from "./useStableCallback";
 import { useUpdater } from "./useUpdater";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { useRunningGames } from "./useRunningGames";
@@ -54,7 +55,6 @@ export function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [achievementsRefreshKey, setAchievementsRefreshKey] = useState(0);
   const [stoppingId, setStoppingId] = useState<string | null>(null);
-  const [installedOnly, setInstalledOnly] = useState(false);
   const updates = useUpdater();
   const { preferences, update: updatePreferences } = usePreferences(setNotice);
 
@@ -143,6 +143,10 @@ export function App() {
     setView(nextView);
     setOverlay(null);
   }
+
+  const openFromLibrary = useStableCallback((game: Game) => openGame(game));
+  const launchFromLibrary = useStableCallback((game: Game) => void handleLaunch(game));
+  const toggleShowHidden = useStableCallback(() => setShowHidden((value) => !value));
 
   function openGame(game: Game) {
     setSelectedId(game.id);
@@ -296,16 +300,14 @@ export function App() {
       <main className="view">
         {view === "home" && renderHome()}
         {view === "library" && (
-          <LibraryShelves
+          <Library
             games={libraryGames}
-            installedOnly={installedOnly}
-            onToggleInstalledOnly={() => setInstalledOnly((value) => !value)}
             hiddenCount={hiddenCount}
             showHidden={showHidden}
             runningIds={runningIds}
-            onToggleShowHidden={() => setShowHidden((value) => !value)}
-            onOpen={openGame}
-            onLaunch={(game) => void handleLaunch(game)}
+            onToggleShowHidden={toggleShowHidden}
+            onOpen={openFromLibrary}
+            onLaunch={launchFromLibrary}
           />
         )}
         {view === "detail" && focusedGame && (

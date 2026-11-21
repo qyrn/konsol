@@ -33,7 +33,7 @@ function previewGame(title: string, accent: string): Game {
       developer: null,
       year: null,
       genre: null,
-      genres: [],
+      tags: [],
       location: null,
     },
   };

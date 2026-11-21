@@ -96,7 +96,7 @@ export function GameDetail({
             <p>Emplacement · {SOURCE_LABELS[game.source]}</p>
             {details.location && <p className="monospace">{details.location}</p>}
           </div>
-          {game.achievements && (
+          {(game.achievements || (game.source === "steam" && !game.installed)) && (
             <button type="button" className="glass-button small-pill" onClick={onOpenAchievements}>
               Voir les succès
             </button>

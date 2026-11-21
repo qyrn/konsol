@@ -6,10 +6,6 @@ use std::time::{Duration, Instant};
 use ureq::Agent;
 
 const STORE_CALL_SPACING: Duration = Duration::from_millis(1500);
-const SOFTWARE_GENRE_IDS: std::ops::RangeInclusive<u32> = 50..=60;
-const LABEL_GENRE_IDS: [u32; 7] = [23, 37, 70, 71, 72, 73, 74];
-const CASUAL_GENRE_ID: u32 = 4;
-const INDIE_GENRE_ID: u32 = 23;
 
 static LAST_STORE_CALL: Mutex<Option<Instant>> = Mutex::new(None);
 
@@ -27,95 +23,12 @@ fn wait_for_store_turn() {
 }
 
 const ASSET_BASE_URL: &str = "https://shared.akamai.steamstatic.com/store_item_assets/";
-const COMMUNITY_ICON_BASE_URL: &str =
-    "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps";
+use crate::steam_cdn::COMMUNITY_IMAGES_URL as COMMUNITY_ICON_BASE_URL;
 
 pub struct StoreArt {
     pub cover: Option<String>,
     pub hero: Option<String>,
     pub icon: Option<String>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct StoreDetails {
-    pub developer: Option<String>,
-    pub year: Option<u16>,
-    pub genres: Vec<String>,
-    pub is_software: bool,
-}
-
-fn game_genres(genres: &[(u32, String)]) -> Vec<String> {
-    let mut chosen: Vec<String> = genres
-        .iter()
-        .filter(|(id, _)| {
-            !LABEL_GENRE_IDS.contains(id)
-                && !SOFTWARE_GENRE_IDS.contains(id)
-                && *id != CASUAL_GENRE_ID
-        })
-        .map(|(_, name)| name.clone())
-        .collect();
-    for fallback in [CASUAL_GENRE_ID, INDIE_GENRE_ID] {
-        if chosen.is_empty()
-            && let Some((_, name)) = genres.iter().find(|(id, _)| *id == fallback)
-        {
-            chosen.push(name.clone());
-        }
-    }
-    chosen
-}
-
-pub fn details(agent: &Agent, app_id: u32) -> Option<StoreDetails> {
-    wait_for_store_turn();
-    let app_id = app_id.to_string();
-    let response = http::get_json(
-        agent,
-        "https://store.steampowered.com/api/appdetails",
-        &[
-            ("appids", &app_id),
-            ("filters", "genres,release_date,developers"),
-            ("l", "french"),
-        ],
-        None,
-    )?;
-    let Some(data) = response.get(&app_id)?.get("data") else {
-        return Some(StoreDetails {
-            developer: None,
-            year: None,
-            genres: Vec::new(),
-            is_software: false,
-        });
-    };
-    let genres: Vec<(u32, String)> = data
-        .get("genres")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(|genre| {
-            let id = genre.get("id")?.as_str()?.parse().ok()?;
-            Some((id, genre.get("description")?.as_str()?.to_string()))
-        })
-        .collect();
-    Some(StoreDetails {
-        developer: data
-            .get("developers")
-            .and_then(|developers| developers.get(0))
-            .and_then(Value::as_str)
-            .map(str::to_string),
-        is_software: genres.iter().any(|(id, _)| SOFTWARE_GENRE_IDS.contains(id)),
-        genres: game_genres(&genres),
-        year: data
-            .get("release_date")
-            .and_then(|release| release.get("date"))
-            .and_then(Value::as_str)
-            .and_then(release_year),
-    })
-}
-
-fn release_year(date: &str) -> Option<u16> {
-    date.split(|character: char| !character.is_ascii_digit())
-        .filter(|part| part.len() == 4)
-        .filter_map(|part| part.parse().ok())
-        .next_back()
 }
 
 pub fn normalized_title(title: &str) -> String {
@@ -190,35 +103,6 @@ pub fn art(agent: &Agent, app_id: u32) -> Option<StoreArt> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn keeps_real_genres_before_labels_and_casual() {
-        let genres = |list: &[(u32, &str)]| {
-            game_genres(
-                &list
-                    .iter()
-                    .map(|(id, name)| (*id, name.to_string()))
-                    .collect::<Vec<_>>(),
-            )
-        };
-        assert_eq!(
-            genres(&[(23, "Indépendant"), (1, "Action"), (25, "Aventure")]),
-            ["Action", "Aventure"]
-        );
-        assert_eq!(
-            genres(&[(4, "Occasionnel"), (23, "Indépendant")]),
-            ["Occasionnel"]
-        );
-        assert_eq!(genres(&[(23, "Indépendant")]), ["Indépendant"]);
-        assert!(genres(&[(57, "Utilitaires")]).is_empty());
-    }
-
-    #[test]
-    fn finds_the_year_in_localized_release_dates() {
-        assert_eq!(release_year("4 nov. 2014"), Some(2014));
-        assert_eq!(release_year("Nov 4, 2014"), Some(2014));
-        assert_eq!(release_year("Bientôt"), None);
-    }
 
     #[test]
     fn normalizes_titles_for_exact_matching() {

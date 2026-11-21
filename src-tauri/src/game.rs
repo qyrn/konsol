@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -71,8 +71,14 @@ pub struct GameDetails {
     pub developer: Option<String>,
     pub year: Option<u16>,
     pub genre: Option<String>,
-    pub genres: Vec<String>,
+    pub tags: Vec<TagWeight>,
     pub location: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TagWeight {
+    pub name: String,
+    pub weight: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]

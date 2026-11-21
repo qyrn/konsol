@@ -1,7 +1,29 @@
 import type { Game } from "./types";
 
-const MAX_SUGGESTIONS = 10;
-const BARELY_PLAYED_MINUTES = 60;
+const MAX_SUGGESTIONS = 12;
+const PLAYED_MINUTES = 60;
+const MIN_SIMILARITY = 0.45;
+const IGNORED_TAGS = new Set([
+  "Solo",
+  "Multijoueur",
+  "Indépendant",
+  "Excellente bande-son",
+  "Atmosphérique",
+  "Accès anticipé",
+  "Free-to-play",
+  "Coopération",
+  "Coop en ligne",
+  "Manette entièrement prise en charge",
+  "Classique",
+  "Culte",
+  "Difficile",
+  "Beau",
+  "Bonne intrigue",
+  "Rejouabilité",
+  "Personnalisation du personnage",
+  "Animé",
+  "Coloré",
+]);
 
 export interface Suggestion {
   game: Game;
@@ -12,53 +34,70 @@ function playtime(game: Game): number {
   return game.details.playtimeMinutes ?? 0;
 }
 
+function tagVector(game: Game): Map<string, number> {
+  const tags = game.details.tags.filter((tag) => !IGNORED_TAGS.has(tag.name));
+  const strongest = Math.max(1, ...tags.map((tag) => tag.weight));
+  return new Map(tags.map((tag) => [tag.name, tag.weight / strongest]));
+}
+
+function cosine(first: Map<string, number>, second: Map<string, number>): number {
+  let dot = 0;
+  for (const [name, weight] of first) dot += weight * (second.get(name) ?? 0);
+  const norm = (vector: Map<string, number>) =>
+    Math.sqrt([...vector.values()].reduce((sum, value) => sum + value * value, 0));
+  const denominator = norm(first) * norm(second);
+  return denominator === 0 ? 0 : dot / denominator;
+}
+
 export function suggestGames(games: Game[]): Suggestion[] {
-  const played = games.filter((game) => playtime(game) >= BARELY_PLAYED_MINUTES);
-  const genreWeight = new Map<string, number>();
-  for (const game of played) {
-    for (const genre of game.details.genres) {
-      genreWeight.set(genre, (genreWeight.get(genre) ?? 0) + Math.log1p(playtime(game)));
-    }
-  }
-  if (genreWeight.size === 0) return [];
+  const played = games
+    .filter((game) => playtime(game) >= PLAYED_MINUTES && game.details.tags.length > 0)
+    .map((game) => ({ game, vector: tagVector(game), pull: Math.log1p(playtime(game) / 60) }));
+  if (played.length === 0) return [];
 
   return games
-    .filter(
-      (game) => !game.hidden && playtime(game) < BARELY_PLAYED_MINUTES && game.details.genres.length > 0,
-    )
-    .map((game) => {
-      const score = game.details.genres.reduce((total, genre) => total + (genreWeight.get(genre) ?? 0), 0);
-      const because = played
-        .filter((other) => other.details.genres.some((genre) => game.details.genres.includes(genre)))
-        .sort((first, second) => playtime(second) - playtime(first))[0];
-      return { game, because, score: score + (game.installed ? 0.5 : 0) };
+    .filter((game) => !game.hidden && playtime(game) < PLAYED_MINUTES && game.details.tags.length > 0)
+    .flatMap((game) => {
+      const vector = tagVector(game);
+      const best = played
+        .map((entry) => ({ entry, similarity: cosine(vector, entry.vector) }))
+        .filter(({ similarity }) => similarity >= MIN_SIMILARITY)
+        .sort(
+          (first, second) => second.similarity * second.entry.pull - first.similarity * first.entry.pull,
+        )[0];
+      return best
+        ? [{ game, because: best.entry.game, score: best.similarity * (1 + best.entry.pull / 10) }]
+        : [];
     })
-    .filter(
-      (entry): entry is Suggestion & { score: number } => entry.score > 0 && entry.because !== undefined,
-    )
     .sort((first, second) => second.score - first.score)
     .slice(0, MAX_SUGGESTIONS)
     .map(({ game, because }) => ({ game, because }));
 }
 
-export interface GenreShelf {
-  genre: string;
+export interface Category {
+  name: string;
   games: Game[];
 }
 
-export const OTHER_GENRE = "Autres";
+export const OTHER_CATEGORY = "Autres";
 
-export function shelvesByGenre(games: Game[]): GenreShelf[] {
-  const byGenre = new Map<string, Game[]>();
+export function categorize(games: Game[]): Category[] {
+  const byCategory = new Map<string, Game[]>();
   for (const game of games) {
-    const genre = game.details.genre ?? OTHER_GENRE;
-    byGenre.set(genre, [...(byGenre.get(genre) ?? []), game]);
+    const name = game.details.genre ?? OTHER_CATEGORY;
+    byCategory.set(name, [...(byCategory.get(name) ?? []), game]);
   }
-  return [...byGenre.entries()]
-    .map(([genre, shelfGames]) => ({ genre, games: shelfGames }))
+  return [...byCategory.entries()]
+    .map(([name, categoryGames]) => ({
+      name,
+      games: [...categoryGames].sort(
+        (first, second) =>
+          Number(second.installed) - Number(first.installed) || first.title.localeCompare(second.title, "fr"),
+      ),
+    }))
     .sort((first, second) => {
-      if (first.genre === OTHER_GENRE) return 1;
-      if (second.genre === OTHER_GENRE) return -1;
-      return second.games.length - first.games.length || first.genre.localeCompare(second.genre, "fr");
+      if (first.name === OTHER_CATEGORY) return 1;
+      if (second.name === OTHER_CATEGORY) return -1;
+      return second.games.length - first.games.length || first.name.localeCompare(second.name, "fr");
     });
 }

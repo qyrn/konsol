@@ -49,7 +49,8 @@ export function AchievementsPanel({ game, refreshKey, onClose }: AchievementsPan
 
   const list = achievements ?? [];
   const unlockedCount = list.filter((achievement) => achievement.unlocked).length;
-  const total = game.achievements?.total ?? null;
+  const total =
+    game.achievements?.total ?? (achievements && achievements.length > 0 ? achievements.length : null);
   const progress = total ? Math.round((unlockedCount / total) * 100) : null;
   const counts: Record<AchievementFilter, number> = {
     all: list.length,
