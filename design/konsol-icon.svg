@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="backdrop" cx="0.5" cy="0.62" r="0.75">
+      <stop offset="0" stop-color="#16348f"/>
+      <stop offset="0.55" stop-color="#0a1440"/>
+      <stop offset="1" stop-color="#04060f"/>
+    </radialGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.98"/>
+      <stop offset="0.45" stop-color="#b9d2ff" stop-opacity="0.78"/>
+      <stop offset="1" stop-color="#4a7bff" stop-opacity="0.6"/>
+    </linearGradient>
+    <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b6bff"/>
+      <stop offset="1" stop-color="#0d1f7a"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.15"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="70"/>
+    </filter>
+    <clipPath id="tile">
+      <rect width="1024" height="1024" rx="228"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="1024" height="1024" fill="url(#backdrop)"/>
+    <ellipse cx="540" cy="640" rx="300" ry="230" fill="#3d6dff" opacity="0.55" filter="url(#glow)"/>
+    <g transform="translate(46 46)">
+      <rect x="250" y="210" width="150" height="604" rx="40" fill="url(#depth)"/>
+      <path d="M430 512 640 210h170L585 512l225 302H640z" fill="url(#depth)" stroke-linejoin="round"/>
+    </g>
+    <rect x="250" y="210" width="150" height="604" rx="40" fill="url(#front)" stroke="url(#rim)" stroke-width="8"/>
+    <path d="M430 512 640 210h170L585 512l225 302H640z" fill="url(#front)" stroke="url(#rim)" stroke-width="8" stroke-linejoin="round"/>
+    <rect x="280" y="244" width="46" height="250" rx="23" fill="#ffffff" opacity="0.55"/>
+    <rect x="1" y="1" width="1022" height="1022" rx="227" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="2"/>
+  </g>
+</svg>
