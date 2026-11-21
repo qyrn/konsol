@@ -1,6 +1,9 @@
 use crate::game::ProcessMarker;
 use std::fs;
 use std::process::Command;
+use std::time::Duration;
+
+const FORCE_STOP_AFTER: Duration = Duration::from_millis(1500);
 
 struct ProcessSnapshot {
     environment: Vec<u8>,
@@ -64,16 +67,29 @@ pub fn stop_matching(marker: &ProcessMarker) -> Result<(), String> {
     if pids.is_empty() {
         return Err("Le jeu ne tourne plus.".to_string());
     }
-    let status = Command::new("kill")
-        .arg("-TERM")
-        .args(&pids)
+    send_signal("-TERM", &pids)?;
+    let marker = marker.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(FORCE_STOP_AFTER);
+        let survivors: Vec<String> = running_pids()
+            .into_iter()
+            .filter(|pid| process_matches(*pid, &marker))
+            .map(|pid| pid.to_string())
+            .collect();
+        if !survivors.is_empty() {
+            let _ = send_signal("-KILL", &survivors);
+        }
+    });
+    Ok(())
+}
+
+fn send_signal(signal: &str, pids: &[String]) -> Result<(), String> {
+    Command::new("kill")
+        .arg(signal)
+        .args(pids)
         .status()
-        .map_err(|error| format!("Impossible d'arrêter le jeu : {error}"))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err("Le jeu n'a pas voulu s'arrêter.".to_string())
-    }
+        .map_err(|error| format!("Impossible d'arrêter le jeu : {error}"))
+        .map(|_| ())
 }
 
 pub fn running_keys<K>(markers: &[(K, ProcessMarker)]) -> Vec<&K> {
