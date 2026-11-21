@@ -1,0 +1,8 @@
+{
+  "name": "konsol-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "module": "dist/index.js",
+  "types": "dist/types/ui/index.d.ts"
+}

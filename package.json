@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" index.html && cargo fmt --manifest-path src-tauri/Cargo.toml",
     "test": "cargo test --manifest-path src-tauri/Cargo.toml",
-    "install-local": "./scripts/install-local.sh"
+    "install-local": "./scripts/install-local.sh",
+    "build:ui": "vite build --config vite.ui.config.ts && tsc -p tsconfig.ui.json"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
