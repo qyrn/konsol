@@ -1,6 +1,6 @@
 [package]
 name = "konsol"
-version = "0.2.0"
+version = "0.3.0"
 description = "Lance tous les jeux du PC depuis une seule app"
 authors = ["qyrn"]
 edition = "2024"
