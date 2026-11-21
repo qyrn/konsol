@@ -13,6 +13,7 @@ import { Backdrop } from "./components/Backdrop";
 import { GameStage } from "./components/GameStage";
 import { GameTray } from "./components/GameTray";
 import { Rail, type SourceFilterValue } from "./components/Rail";
+import { RenameForm } from "./components/RenameForm";
 import { SettingsForm } from "./components/SettingsForm";
 import { DEFAULT_ACCENT, cssVariable } from "./images";
 import type { Game } from "./types";
@@ -35,6 +36,7 @@ export function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [addingGame, setAddingGame] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
   const [achievementsOpen, setAchievementsOpen] = useState(false);
   const [achievementsRefreshKey, setAchievementsRefreshKey] = useState(0);
 
@@ -82,7 +84,7 @@ export function App() {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      const modalOpen = addingGame || settingsOpen || achievementsOpen;
+      const modalOpen = addingGame || settingsOpen || achievementsOpen || renaming;
       if (modalOpen || isTypingTarget(event.target) || visibleGames.length === 0) return;
       const index = selectedGame ? visibleGames.indexOf(selectedGame) : 0;
       if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
@@ -180,6 +182,7 @@ export function App() {
             onToggleHidden={handleToggleHidden}
             onRemove={handleRemove}
             onOpenAchievements={() => setAchievementsOpen(true)}
+            onRename={() => setRenaming(true)}
           />
         ) : (
           !library.loading && <p className="message">{emptyMessage}</p>
@@ -205,6 +208,18 @@ export function App() {
             void library.reload();
           }}
           onCancel={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {renaming && selectedGame && (
+        <RenameForm
+          game={selectedGame}
+          onRenamed={(title) => {
+            setRenaming(false);
+            setNotice(`C'est noté, le jeu s'appelle ${title} maintenant.`);
+            void library.reload();
+          }}
+          onCancel={() => setRenaming(false)}
         />
       )}
 

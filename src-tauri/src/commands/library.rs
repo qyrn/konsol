@@ -1,6 +1,7 @@
 use crate::achievement_watch::{self, WatchContext};
 use crate::achievements;
 use crate::artwork;
+use crate::commands::manual::validate_title;
 use crate::desktop_entry::DesktopPaths;
 use crate::game::Game;
 use crate::launcher;
@@ -122,4 +123,15 @@ pub fn set_game_hidden(id: String, hidden: bool, state: State<'_, AppState>) -> 
         }
         Ok(())
     })
+}
+
+#[tauri::command]
+pub fn rename_game(id: String, title: String, state: State<'_, AppState>) -> Result<(), String> {
+    let title = validate_title(&title)?;
+    update_config(&state, |config| {
+        config.custom_titles.insert(id.clone(), title);
+        Ok(())
+    })?;
+    lock(&state.metadata).forget(&id);
+    Ok(())
 }

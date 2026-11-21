@@ -87,6 +87,12 @@ impl MetadataStore {
         changed
     }
 
+    pub fn forget(&mut self, game_id: &str) {
+        if self.entries.remove(game_id).is_some() {
+            self.save();
+        }
+    }
+
     pub fn reset_key_lookups(&mut self) {
         for metadata in self.entries.values_mut() {
             metadata.grid_lookup_done = false;

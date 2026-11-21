@@ -17,6 +17,9 @@ pub fn scan_all(home: &Path, config: &KonsolConfig) -> Vec<Game> {
         .collect();
     for game in &mut games {
         game.hidden = config.hidden_game_ids.contains(&game.id);
+        if let Some(title) = config.custom_titles.get(&game.id) {
+            game.title = title.clone();
+        }
     }
     games.sort_by_cached_key(|game| game.title.to_lowercase());
     games

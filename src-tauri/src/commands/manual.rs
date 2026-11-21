@@ -37,7 +37,7 @@ pub fn remove_manual_game(id: String, state: State<'_, AppState>) -> Result<(), 
     })
 }
 
-fn validate_title(title: &str) -> Result<String, String> {
+pub fn validate_title(title: &str) -> Result<String, String> {
     let title = title.trim();
     if title.is_empty() {
         return Err("Donne un nom au jeu.".to_string());

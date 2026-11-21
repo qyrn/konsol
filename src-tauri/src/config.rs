@@ -1,5 +1,6 @@
 use crate::metadata::ApiKeys;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::io::{ErrorKind, Write};
 use std::os::unix::fs::OpenOptionsExt;
@@ -10,6 +11,7 @@ use std::path::PathBuf;
 pub struct KonsolConfig {
     pub manual_games: Vec<ManualGame>,
     pub hidden_game_ids: Vec<String>,
+    pub custom_titles: BTreeMap<String, String>,
     pub steam_grid_db_api_key: Option<String>,
     pub steam_web_api_key: Option<String>,
 }

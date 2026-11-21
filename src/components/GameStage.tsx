@@ -9,6 +9,7 @@ interface GameStageProps {
   onToggleHidden: (game: Game) => void;
   onRemove: (game: Game) => void;
   onOpenAchievements: () => void;
+  onRename: () => void;
 }
 
 export function GameStage({
@@ -18,6 +19,7 @@ export function GameStage({
   onToggleHidden,
   onRemove,
   onOpenAchievements,
+  onRename,
 }: GameStageProps) {
   return (
     <section className="stage" aria-live="polite">
@@ -29,6 +31,9 @@ export function GameStage({
       <div className="stage-actions">
         <button type="button" className="launch-button" disabled={launching} onClick={() => onLaunch(game)}>
           {launching ? "Ça se lance…" : "Lancer"}
+        </button>
+        <button type="button" className="glass-button" onClick={onRename}>
+          Renommer
         </button>
         {game.source === "manual" ? (
           <button type="button" className="glass-button" onClick={() => onRemove(game)}>
