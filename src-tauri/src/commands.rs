@@ -1,7 +1,10 @@
+use crate::artwork;
 use crate::config::{ConfigStore, KonsolConfig, ManualGame};
+use crate::desktop_entry::DesktopPaths;
 use crate::game::Game;
 use crate::launcher;
 use crate::sources::{self, is_executable_file};
+use crate::window_watch;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
@@ -13,6 +16,9 @@ pub struct AppState {
     pub home: PathBuf,
     pub config: Mutex<ConfigStore>,
     pub games: Mutex<HashMap<String, Game>>,
+    pub accents: Mutex<HashMap<PathBuf, Option<String>>>,
+    pub applications_dir: PathBuf,
+    pub icons_dir: PathBuf,
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -34,7 +40,8 @@ fn update_config(
 #[tauri::command]
 pub fn list_games(state: State<'_, AppState>) -> Result<Vec<Game>, String> {
     let config = lock(&state.config).load()?;
-    let games = sources::scan_all(&state.home, &config);
+    let mut games = sources::scan_all(&state.home, &config);
+    fill_accents(&mut games, &state.accents);
     *lock(&state.games) = games
         .iter()
         .map(|game| (game.id.clone(), game.clone()))
@@ -42,13 +49,38 @@ pub fn list_games(state: State<'_, AppState>) -> Result<Vec<Game>, String> {
     Ok(games)
 }
 
+fn fill_accents(games: &mut [Game], cache: &Mutex<HashMap<PathBuf, Option<String>>>) {
+    let mut cache = lock(cache);
+    for game in games {
+        let from_cover = game
+            .cover
+            .as_ref()
+            .and_then(|cover| cover.local_path())
+            .and_then(|path| {
+                cache
+                    .entry(path)
+                    .or_insert_with_key(|path| artwork::dominant_accent(path))
+                    .clone()
+            });
+        game.accent = Some(from_cover.unwrap_or_else(|| artwork::accent_from_title(&game.title)));
+    }
+}
+
 #[tauri::command]
 pub fn launch_game(id: String, state: State<'_, AppState>) -> Result<(), String> {
-    let target = lock(&state.games)
+    let game = lock(&state.games)
         .get(&id)
-        .map(|game| game.launch.clone())
+        .cloned()
         .ok_or("Ce jeu n'est plus dans la liste, actualise la bibliothèque.")?;
-    launcher::launch(&target)
+    launcher::launch(&game)?;
+    window_watch::watch_for_game_window(
+        game,
+        DesktopPaths {
+            applications: state.applications_dir.clone(),
+            icons: state.icons_dir.clone(),
+        },
+    );
+    Ok(())
 }
 
 #[tauri::command]

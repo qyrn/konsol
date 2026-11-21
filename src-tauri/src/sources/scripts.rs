@@ -1,4 +1,4 @@
-use crate::game::{Game, GameSource, LaunchTarget};
+use crate::game::{Game, GameSource};
 use crate::sources::is_executable_file;
 use std::fs;
 use std::path::Path;
@@ -15,14 +15,13 @@ pub fn scan(home: &Path) -> Vec<Game> {
         .filter_map(|path| {
             let file_name = path.file_name()?.to_str()?.to_string();
             let stem = path.file_stem()?.to_str()?;
-            Some(Game {
-                id: format!("script:{file_name}"),
-                title: title_from_file_stem(stem),
-                source: GameSource::Script,
-                cover: None,
-                hidden: false,
-                launch: LaunchTarget::Program(path),
-            })
+            let title = title_from_file_stem(stem);
+            Some(Game::program(
+                format!("script:{file_name}"),
+                title,
+                GameSource::Script,
+                path,
+            ))
         })
         .collect()
 }

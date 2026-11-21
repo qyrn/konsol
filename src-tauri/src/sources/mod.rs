@@ -3,7 +3,7 @@ mod scripts;
 mod steam;
 
 use crate::config::KonsolConfig;
-use crate::game::{Game, GameSource, LaunchTarget};
+use crate::game::{Game, GameSource};
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -23,13 +23,13 @@ pub fn scan_all(home: &Path, config: &KonsolConfig) -> Vec<Game> {
 }
 
 fn manual_games(config: &KonsolConfig) -> impl Iterator<Item = Game> + '_ {
-    config.manual_games.iter().map(|manual| Game {
-        id: manual.id.clone(),
-        title: manual.title.clone(),
-        source: GameSource::Manual,
-        cover: None,
-        hidden: false,
-        launch: LaunchTarget::Program(manual.executable.clone()),
+    config.manual_games.iter().map(|manual| {
+        Game::program(
+            manual.id.clone(),
+            manual.title.clone(),
+            GameSource::Manual,
+            manual.executable.clone(),
+        )
     })
 }
 

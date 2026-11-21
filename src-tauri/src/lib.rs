@@ -1,9 +1,12 @@
+mod artwork;
 mod commands;
 mod config;
+mod desktop_entry;
 mod game;
 mod launcher;
 mod sources;
 mod vdf;
+mod window_watch;
 
 use commands::AppState;
 use config::ConfigStore;
@@ -14,12 +17,16 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            let home = app.path().home_dir()?;
-            let config_path = app.path().app_config_dir()?.join("config.json");
+            let paths = app.path();
             app.manage(AppState {
-                home,
-                config: Mutex::new(ConfigStore::new(config_path)),
+                home: paths.home_dir()?,
+                config: Mutex::new(ConfigStore::new(
+                    paths.app_config_dir()?.join("config.json"),
+                )),
                 games: Mutex::new(HashMap::new()),
+                accents: Mutex::new(HashMap::new()),
+                applications_dir: paths.data_dir()?.join("applications"),
+                icons_dir: paths.app_data_dir()?.join("icons"),
             });
             Ok(())
         })

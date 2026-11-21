@@ -1,9 +1,10 @@
-use crate::game::{Cover, Game, GameSource, LaunchTarget};
+use crate::game::{Game, GameSource, ImageSource, LaunchTarget, ProcessMarker};
 use crate::vdf::{self, VdfValue};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 const FULLY_INSTALLED_FLAG: u32 = 4;
+const ICON_SIZES: [&str; 6] = ["256x256", "128x128", "96x96", "64x64", "48x48", "32x32"];
 const TOOL_NAME_PREFIXES: [&str; 3] = [
     "Proton",
     "Steam Linux Runtime",
@@ -15,7 +16,7 @@ pub fn scan(home: &Path) -> Vec<Game> {
     library_paths(&steam_root)
         .iter()
         .flat_map(|library| manifests_in(&library.join("steamapps")))
-        .filter_map(|manifest| game_from_manifest(&manifest, &steam_root))
+        .filter_map(|manifest| game_from_manifest(&manifest, &steam_root, home))
         .collect()
 }
 
@@ -61,7 +62,7 @@ fn manifests_in(steamapps: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-fn game_from_manifest(manifest: &Path, steam_root: &Path) -> Option<Game> {
+fn game_from_manifest(manifest: &Path, steam_root: &Path, home: &Path) -> Option<Game> {
     let content = fs::read_to_string(manifest).ok()?;
     let root = vdf::parse(&content);
     let app_state = root.get("AppState")?;
@@ -74,13 +75,24 @@ fn game_from_manifest(manifest: &Path, steam_root: &Path) -> Option<Game> {
     {
         return None;
     }
+    let cache = steam_root.join("appcache/librarycache");
+    let cover = find_art(&cache, app_id, "library_600x900.jpg");
+    let icon_source =
+        find_icon(home, app_id).or_else(|| cover.as_ref().and_then(ImageSource::local_path));
     Some(Game {
         id: format!("steam:{app_id}"),
         title: name.to_string(),
         source: GameSource::Steam,
-        cover: find_cover(steam_root, app_id),
+        hero: find_art(&cache, app_id, "library_hero.jpg"),
+        cover,
+        accent: None,
         hidden: false,
         launch: LaunchTarget::SteamApp(app_id.to_string()),
+        process_marker: ProcessMarker::EnvVar {
+            name: "SteamAppId",
+            value: app_id.to_string(),
+        },
+        icon_source,
     })
 }
 
@@ -90,15 +102,27 @@ fn is_steam_tool(name: &str) -> bool {
         .any(|prefix| name.starts_with(prefix))
 }
 
-fn find_cover(steam_root: &Path, app_id: &str) -> Option<Cover> {
-    let cache = steam_root.join("appcache/librarycache");
+fn find_art(cache: &Path, app_id: &str, file_name: &str) -> Option<ImageSource> {
     [
-        cache.join(app_id).join("library_600x900.jpg"),
-        cache.join(format!("{app_id}_library_600x900.jpg")),
+        cache.join(app_id).join(file_name),
+        cache.join(format!("{app_id}_{file_name}")),
     ]
     .into_iter()
     .find(|path| path.is_file())
-    .map(|path| Cover::File(path.to_string_lossy().into_owned()))
+    .map(|path| ImageSource::File(path.to_string_lossy().into_owned()))
+}
+
+fn find_icon(home: &Path, app_id: &str) -> Option<PathBuf> {
+    let icons = home.join(".local/share/icons/hicolor");
+    ICON_SIZES
+        .iter()
+        .map(|size| {
+            icons
+                .join(size)
+                .join("apps")
+                .join(format!("steam_icon_{app_id}.png"))
+        })
+        .find(|path| path.is_file())
 }
 
 #[cfg(test)]

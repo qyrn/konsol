@@ -1,11 +1,12 @@
-use crate::game::LaunchTarget;
+use crate::game::{Game, KONSOL_GAME_ID_VARIABLE, LaunchTarget};
 use std::os::unix::process::CommandExt;
 use std::process::{Command, Stdio};
 use std::thread;
 
-pub fn launch(target: &LaunchTarget) -> Result<(), String> {
-    let mut command = build_command(target);
+pub fn launch(game: &Game) -> Result<(), String> {
+    let mut command = build_command(&game.launch);
     command
+        .env(KONSOL_GAME_ID_VARIABLE, &game.id)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
