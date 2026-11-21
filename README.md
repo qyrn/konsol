@@ -28,9 +28,9 @@ Sur l'accueil, tes jeux installés défilent en carrousel, du dernier joué au p
 > [!TIP]
 > Konsol fouille `~/Games` et `~/Jeux` par défaut. Tu changes la liste dans Réglages, Sources, Dossiers de jeux.
 
-## 📚 Toute ta bibliothèque, rangée par genre
+## 📚 Toute ta bibliothèque, rangée par type de jeu
 
-L'onglet Bibliothèque montre aussi les jeux que t'as achetés sans les installer, rangés par genre : Action, RPG, Aventure, Simulation… En haut, la rangée À essayer te propose des jeux que t'as à peine lancés et qui ressemblent à ceux où tu passes le plus de temps, avec le jeu qui a fait pencher la balance. Sur un jeu pas installé, le bouton Installer ouvre directement Steam ou Heroic sur la bonne page.
+L'onglet Bibliothèque montre aussi les jeux que t'as achetés sans les installer, rangés par type de jeu d'après les tags Steam : FPS, Monde ouvert, Survie, Simulation… Les pastilles en haut filtrent une catégorie ou seulement les jeux installés. La rangée Reprendre garde tes dernières parties sous la main, et À essayer te propose des jeux que t'as à peine lancés et qui ressemblent vraiment à ceux où tu passes le plus de temps. Les serveurs de test, les playtests et les logiciels sont écartés. Sur un jeu pas installé, le bouton Installer ouvre directement Steam ou Heroic sur la bonne page.
 
 <div align="center">
 <img src="docs/library.png" width="560" alt="La bibliothèque avec la rangée À essayer : Hades, Hollow Knight, Elden Ring, Vampire Survivors et Stardew Valley, chacun avec la phrase Parce que tu joues à, puis la rangée Action" />
@@ -41,7 +41,7 @@ L'onglet Bibliothèque montre aussi les jeux que t'as achetés sans les installe
 
 ## ⏱️ Ton temps de jeu, même sans launcher
 
-La fiche d'un jeu affiche son studio, son année et son genre, ton temps de jeu, tes succès, sa place sur le disque et ta dernière session. Pour Steam et Heroic, le temps vient de leurs fichiers. Pour les jeux sans launcher, c'est Konsol qui chronomètre, même si tu lances le jeu depuis le menu de KDE, et il retrouve ta dernière session dans l'historique de KDE.
+La fiche d'un jeu affiche son studio, son année et son genre, ton temps de jeu, tes succès, sa place sur le disque et ta dernière session. Pour Steam et Heroic, le temps vient de leurs fichiers. Pour les jeux sans launcher, Konsol reprend la durée de chaque partie lancée depuis le menu de KDE dans le journal de systemd, et chronomètre lui-même celles que tu lances depuis Konsol.
 
 <div align="center">
 <img src="docs/detail.png" width="560" alt="La fiche de The Binding of Isaac : Nicalis, 2014, Action, 203 h de jeu, 106 / 641 succès, 1,6 Go sur le disque, dernière session hier" />
@@ -57,7 +57,7 @@ Au premier lancement d'un jeu depuis Konsol, il repère sa fenêtre et lui crée
 
 ## 🏆 Les succès, avec une notif quand tu en débloques un
 
-Clique sur « x / y succès » pour voir la liste complète, avec les icônes, la date de chaque déblocage et le pourcentage de joueurs qui l'ont. Pendant que tu joues, Konsol surveille tes succès et t'envoie une notification KDE dès que t'en débloques un. Ça marche pour Steam et pour les repacks qui enregistrent leurs succès dans `SteamData/user_stats.ini`.
+Clique sur « x / y succès » pour voir la liste complète, avec les icônes, la date de chaque déblocage et le pourcentage de joueurs qui l'ont. Pour un jeu Steam pas installé, Konsol les récupère directement sur ton compte Steam si t'as mis une clé API. Pendant que tu joues, Konsol surveille tes succès et t'envoie une notification KDE dès que t'en débloques un. Ça marche pour Steam et pour les repacks qui enregistrent leurs succès dans `SteamData/user_stats.ini`.
 
 > [!NOTE]
 > Pour GOG, les succès viennent du cache de Heroic, donc ils bougent quand Heroic se synchronise. Pour les repacks, une clé API Steam donne les vrais noms et les icônes.
