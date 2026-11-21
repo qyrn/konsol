@@ -1,13 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
-import { errorMessage, launchGame, removeManualGame, setGameHidden } from "./api";
+import {
+  ACHIEVEMENT_EVENT,
+  LIBRARY_EVENT,
+  errorMessage,
+  launchGame,
+  removeManualGame,
+  setGameHidden,
+} from "./api";
+import { AchievementsPanel } from "./components/AchievementsPanel";
 import { AddGameForm } from "./components/AddGameForm";
 import { Backdrop } from "./components/Backdrop";
 import { GameStage } from "./components/GameStage";
 import { GameTray } from "./components/GameTray";
 import { Rail, type SourceFilterValue } from "./components/Rail";
+import { SettingsForm } from "./components/SettingsForm";
 import { DEFAULT_ACCENT, cssVariable } from "./images";
 import type { Game } from "./types";
 import { useLibrary } from "./useLibrary";
+import { useTauriEvent } from "./useTauriEvent";
 
 const NOTICE_DURATION_MS = 4000;
 
@@ -24,6 +34,15 @@ export function App() {
   const [launchingId, setLaunchingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [addingGame, setAddingGame] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [achievementsOpen, setAchievementsOpen] = useState(false);
+  const [achievementsRefreshKey, setAchievementsRefreshKey] = useState(0);
+
+  useTauriEvent(LIBRARY_EVENT, () => void library.reload());
+  useTauriEvent(ACHIEVEMENT_EVENT, () => {
+    setAchievementsRefreshKey((key) => key + 1);
+    void library.reload();
+  });
 
   useEffect(() => {
     if (!notice) return;
@@ -63,7 +82,8 @@ export function App() {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (addingGame || isTypingTarget(event.target) || visibleGames.length === 0) return;
+      const modalOpen = addingGame || settingsOpen || achievementsOpen;
+      if (modalOpen || isTypingTarget(event.target) || visibleGames.length === 0) return;
       const index = selectedGame ? visibleGames.indexOf(selectedGame) : 0;
       if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
         event.preventDefault();
@@ -125,6 +145,7 @@ export function App() {
         onFilterChange={setSourceFilter}
         onShowHiddenChange={setShowHidden}
         onAddGame={() => setAddingGame(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       <header className="toolbar">
@@ -158,6 +179,7 @@ export function App() {
             onLaunch={(game) => void handleLaunch(game)}
             onToggleHidden={handleToggleHidden}
             onRemove={handleRemove}
+            onOpenAchievements={() => setAchievementsOpen(true)}
           />
         ) : (
           !library.loading && <p className="message">{emptyMessage}</p>
@@ -174,6 +196,25 @@ export function App() {
       )}
 
       {addingGame && <AddGameForm onAdded={handleAdded} onCancel={() => setAddingGame(false)} />}
+
+      {settingsOpen && (
+        <SettingsForm
+          onSaved={() => {
+            setSettingsOpen(false);
+            setNotice("Réglages enregistrés, Konsol va chercher ce qui manque.");
+            void library.reload();
+          }}
+          onCancel={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {achievementsOpen && selectedGame && (
+        <AchievementsPanel
+          game={selectedGame}
+          refreshKey={achievementsRefreshKey}
+          onClose={() => setAchievementsOpen(false)}
+        />
+      )}
 
       <div className="notice glass" role="status" aria-live="polite">
         {notice}

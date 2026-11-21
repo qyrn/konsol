@@ -12,6 +12,7 @@ interface RailProps {
   onFilterChange: (value: SourceFilterValue) => void;
   onShowHiddenChange: (value: boolean) => void;
   onAddGame: () => void;
+  onOpenSettings: () => void;
 }
 
 export function Rail({
@@ -22,6 +23,7 @@ export function Rail({
   onFilterChange,
   onShowHiddenChange,
   onAddGame,
+  onOpenSettings,
 }: RailProps) {
   const options: { value: SourceFilterValue; label: string; count: number }[] = [
     { value: "all", label: "Tous", count: games.length },
@@ -68,6 +70,9 @@ export function Rail({
         )}
         <button type="button" className="glass-button" onClick={onAddGame}>
           Ajouter un jeu
+        </button>
+        <button type="button" className="glass-button" onClick={onOpenSettings}>
+          Réglages
         </button>
       </div>
     </aside>
