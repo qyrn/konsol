@@ -17,6 +17,12 @@ const TOGGLES: { key: keyof Preferences; label: string; description: string }[] 
     description: "La fenêtre revient quand le jeu se ferme.",
   },
   {
+    key: "keepRunningInBackground",
+    label: "Garder Konsol en fond",
+    description:
+      "Quand tu fermes la fenêtre, Konsol reste dans la barre système pour compter ton temps de jeu et repérer les nouveaux jeux.",
+  },
+  {
     key: "accentFollowsGame",
     label: "Couleur d'accent suivant le jeu",
     description: "Le halo et le bouton Lancer prennent la couleur du jeu sélectionné.",

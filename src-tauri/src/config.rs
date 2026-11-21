@@ -15,6 +15,7 @@ pub struct KonsolConfig {
     pub steam_grid_db_api_key: Option<String>,
     pub steam_web_api_key: Option<String>,
     pub preferences: Preferences,
+    pub game_folders: Option<Vec<PathBuf>>,
 }
 
 impl KonsolConfig {
@@ -45,6 +46,7 @@ pub struct ManualGame {
 pub struct Preferences {
     pub launch_at_login: bool,
     pub minimize_during_session: bool,
+    pub keep_running_in_background: bool,
     pub accent_follows_game: bool,
     pub reduce_motion: bool,
 }
@@ -54,6 +56,7 @@ impl Default for Preferences {
         Self {
             launch_at_login: false,
             minimize_during_session: false,
+            keep_running_in_background: true,
             accent_follows_game: true,
             reduce_motion: false,
         }

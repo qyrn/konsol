@@ -1,23 +1,34 @@
 use super::http;
 use serde_json::{Value, json};
+use std::sync::Mutex;
+use std::thread;
+use std::time::{Duration, Instant};
 use ureq::Agent;
+
+const STORE_CALL_SPACING: Duration = Duration::from_millis(1500);
+const SOFTWARE_GENRE_IDS: std::ops::RangeInclusive<u32> = 50..=60;
+const LABEL_GENRE_IDS: [u32; 7] = [23, 37, 70, 71, 72, 73, 74];
+const CASUAL_GENRE_ID: u32 = 4;
+const INDIE_GENRE_ID: u32 = 23;
+
+static LAST_STORE_CALL: Mutex<Option<Instant>> = Mutex::new(None);
+
+fn wait_for_store_turn() {
+    let mut last_call = LAST_STORE_CALL
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some(previous) = *last_call {
+        let elapsed = previous.elapsed();
+        if elapsed < STORE_CALL_SPACING {
+            thread::sleep(STORE_CALL_SPACING - elapsed);
+        }
+    }
+    *last_call = Some(Instant::now());
+}
 
 const ASSET_BASE_URL: &str = "https://shared.akamai.steamstatic.com/store_item_assets/";
 const COMMUNITY_ICON_BASE_URL: &str =
     "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps";
-const SOFTWARE_GENRES: [&str; 11] = [
-    "Utilities",
-    "Design & Illustration",
-    "Animation & Modeling",
-    "Photo Editing",
-    "Video Production",
-    "Audio Production",
-    "Software Training",
-    "Web Publishing",
-    "Education",
-    "Game Development",
-    "Accounting",
-];
 
 pub struct StoreArt {
     pub cover: Option<String>,
@@ -29,10 +40,32 @@ pub struct StoreArt {
 pub struct StoreDetails {
     pub developer: Option<String>,
     pub year: Option<u16>,
-    pub genre: Option<String>,
+    pub genres: Vec<String>,
+    pub is_software: bool,
+}
+
+fn game_genres(genres: &[(u32, String)]) -> Vec<String> {
+    let mut chosen: Vec<String> = genres
+        .iter()
+        .filter(|(id, _)| {
+            !LABEL_GENRE_IDS.contains(id)
+                && !SOFTWARE_GENRE_IDS.contains(id)
+                && *id != CASUAL_GENRE_ID
+        })
+        .map(|(_, name)| name.clone())
+        .collect();
+    for fallback in [CASUAL_GENRE_ID, INDIE_GENRE_ID] {
+        if chosen.is_empty()
+            && let Some((_, name)) = genres.iter().find(|(id, _)| *id == fallback)
+        {
+            chosen.push(name.clone());
+        }
+    }
+    chosen
 }
 
 pub fn details(agent: &Agent, app_id: u32) -> Option<StoreDetails> {
+    wait_for_store_turn();
     let app_id = app_id.to_string();
     let response = http::get_json(
         agent,
@@ -44,18 +77,32 @@ pub fn details(agent: &Agent, app_id: u32) -> Option<StoreDetails> {
         ],
         None,
     )?;
-    let data = response.get(&app_id)?.get("data")?;
-    let first_text = |list: Option<&Value>, field: Option<&str>| {
-        let item = list?.as_array()?.first()?;
-        let text = match field {
-            Some(field) => item.get(field)?,
-            None => item,
-        };
-        text.as_str().map(str::to_string)
+    let Some(data) = response.get(&app_id)?.get("data") else {
+        return Some(StoreDetails {
+            developer: None,
+            year: None,
+            genres: Vec::new(),
+            is_software: false,
+        });
     };
+    let genres: Vec<(u32, String)> = data
+        .get("genres")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|genre| {
+            let id = genre.get("id")?.as_str()?.parse().ok()?;
+            Some((id, genre.get("description")?.as_str()?.to_string()))
+        })
+        .collect();
     Some(StoreDetails {
-        developer: first_text(data.get("developers"), None),
-        genre: first_text(data.get("genres"), Some("description")),
+        developer: data
+            .get("developers")
+            .and_then(|developers| developers.get(0))
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        is_software: genres.iter().any(|(id, _)| SOFTWARE_GENRE_IDS.contains(id)),
+        genres: game_genres(&genres),
         year: data
             .get("release_date")
             .and_then(|release| release.get("date"))
@@ -80,6 +127,7 @@ pub fn normalized_title(title: &str) -> String {
 }
 
 pub fn find_app_id(agent: &Agent, title: &str) -> Option<u32> {
+    wait_for_store_turn();
     let response = http::get_json(
         agent,
         "https://store.steampowered.com/api/storesearch/",
@@ -139,30 +187,31 @@ pub fn art(agent: &Agent, app_id: u32) -> Option<StoreArt> {
     })
 }
 
-pub fn is_software(agent: &Agent, app_id: &str) -> Option<bool> {
-    let response = http::get_json(
-        agent,
-        "https://store.steampowered.com/api/appdetails",
-        &[("appids", app_id), ("filters", "genres"), ("l", "english")],
-        None,
-    )?;
-    let data = response.get(app_id)?.get("data")?;
-    let genres = data
-        .get("genres")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    Some(genres.iter().any(|genre| {
-        genre
-            .get("description")
-            .and_then(Value::as_str)
-            .is_some_and(|description| SOFTWARE_GENRES.contains(&description))
-    }))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn keeps_real_genres_before_labels_and_casual() {
+        let genres = |list: &[(u32, &str)]| {
+            game_genres(
+                &list
+                    .iter()
+                    .map(|(id, name)| (*id, name.to_string()))
+                    .collect::<Vec<_>>(),
+            )
+        };
+        assert_eq!(
+            genres(&[(23, "Indépendant"), (1, "Action"), (25, "Aventure")]),
+            ["Action", "Aventure"]
+        );
+        assert_eq!(
+            genres(&[(4, "Occasionnel"), (23, "Indépendant")]),
+            ["Occasionnel"]
+        );
+        assert_eq!(genres(&[(23, "Indépendant")]), ["Indépendant"]);
+        assert!(genres(&[(57, "Utilitaires")]).is_empty());
+    }
 
     #[test]
     fn finds_the_year_in_localized_release_dates() {

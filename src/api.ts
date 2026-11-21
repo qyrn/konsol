@@ -28,6 +28,10 @@ export function addManualGame(game: NewManualGame): Promise<string> {
   return invoke<string>("add_manual_game", { game });
 }
 
+export function saveGameFolders(folders: string[]): Promise<void> {
+  return invoke("save_game_folders", { folders });
+}
+
 export function stopGame(id: string): Promise<void> {
   return invoke("stop_game", { id });
 }

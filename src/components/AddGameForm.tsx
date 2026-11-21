@@ -24,6 +24,7 @@ function previewGame(title: string, accent: string): Game {
     hero: null,
     accent,
     hidden: false,
+    installed: true,
     achievements: null,
     details: {
       playtimeMinutes: null,
@@ -32,6 +33,7 @@ function previewGame(title: string, accent: string): Game {
       developer: null,
       year: null,
       genre: null,
+      genres: [],
       location: null,
     },
   };

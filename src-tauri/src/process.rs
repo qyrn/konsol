@@ -39,6 +39,9 @@ fn snapshot_matches(snapshot: &ProcessSnapshot, marker: &ProcessMarker) -> bool 
             contains(&snapshot.environment, text.as_bytes())
                 || contains(&snapshot.command_line, text.as_bytes())
         }
+        ProcessMarker::AnyOf(markers) => markers
+            .iter()
+            .any(|marker| snapshot_matches(snapshot, marker)),
     }
 }
 

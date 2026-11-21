@@ -22,11 +22,14 @@ import { RenameForm } from "./components/RenameForm";
 import { SettingsPage } from "./components/SettingsPage";
 import { type SessionIndicator, TopBar } from "./components/TopBar";
 import { byMostRecent } from "./format";
+import { SOURCE_LAUNCHERS } from "./sources";
 import { DEFAULT_ACCENT, cssVariable } from "./images";
 import type { LaunchStatus } from "./launchStatus";
 import type { Game } from "./types";
 import { useLibrary } from "./useLibrary";
 import { usePreferences } from "./usePreferences";
+import { useUpdater } from "./useUpdater";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { useRunningGames } from "./useRunningGames";
 import { useSessionStarts } from "./useSessionStarts";
 import { useTauriEvent } from "./useTauriEvent";
@@ -51,6 +54,8 @@ export function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [achievementsRefreshKey, setAchievementsRefreshKey] = useState(0);
   const [stoppingId, setStoppingId] = useState<string | null>(null);
+  const [installedOnly, setInstalledOnly] = useState(false);
+  const updates = useUpdater();
   const { preferences, update: updatePreferences } = usePreferences(setNotice);
 
   useTauriEvent(LIBRARY_EVENT, () => void library.reload());
@@ -75,13 +80,17 @@ export function App() {
     return () => window.clearTimeout(timeout);
   }, [notice]);
 
-  const visibleGames = useMemo(
+  const libraryGames = useMemo(
     () => library.games.filter((game) => showHidden || !game.hidden).sort(byMostRecent),
     [library.games, showHidden],
   );
+  const visibleGames = useMemo(() => libraryGames.filter((game) => game.installed), [libraryGames]);
   const hiddenCount = library.games.filter((game) => game.hidden).length;
   const selectedGame = visibleGames.find((game) => game.id === selectedId) ?? visibleGames[0] ?? null;
+  const focusedGame = libraryGames.find((game) => game.id === selectedId) ?? selectedGame;
   const selectedIndex = selectedGame ? visibleGames.indexOf(selectedGame) : 0;
+  const stageGame = view === "home" ? selectedGame : focusedGame;
+  const backdropGames = stageGame && !stageGame.installed ? [...visibleGames, stageGame] : visibleGames;
 
   function launchStatus(game: Game): LaunchStatus {
     if (runningIds.has(game.id)) return "running";
@@ -91,6 +100,15 @@ export function App() {
   async function handleLaunch(game: Game) {
     setSelectedId(game.id);
     setOverlay(null);
+    if (!game.installed) {
+      try {
+        await launchGame(game.id);
+        setNotice(`${SOURCE_LAUNCHERS[game.source]} s'ouvre pour installer ${game.title}.`);
+      } catch (error) {
+        setNotice(errorMessage(error));
+      }
+      return;
+    }
     if (launchStatus(game) !== "idle") return;
     setLaunchingId(game.id);
     try {
@@ -251,14 +269,6 @@ export function App() {
             />
           </>
         )}
-        <footer className="home-footer">
-          <span className="home-position">
-            {selectedIndex + 1} / {visibleGames.length}
-          </span>
-          <span>← → parcourir</span>
-          {selectedStart === undefined && <span>Entrée lancer</span>}
-          <span>Ctrl K rechercher</span>
-        </footer>
       </div>
     );
   }
@@ -270,10 +280,10 @@ export function App() {
       data-reduce-motion={preferences.reduceMotion}
       style={cssVariable(
         "--accent",
-        preferences.accentFollowsGame ? (selectedGame?.accent ?? DEFAULT_ACCENT) : DEFAULT_ACCENT,
+        preferences.accentFollowsGame ? (stageGame?.accent ?? DEFAULT_ACCENT) : DEFAULT_ACCENT,
       )}
     >
-      <Backdrop games={visibleGames} selectedId={selectedGame?.id ?? null} veil={VIEW_VEIL[view]} />
+      <Backdrop games={backdropGames} selectedId={stageGame?.id ?? null} veil={VIEW_VEIL[view]} />
 
       <TopBar
         view={view}
@@ -287,7 +297,9 @@ export function App() {
         {view === "home" && renderHome()}
         {view === "library" && (
           <LibraryShelves
-            games={visibleGames}
+            games={libraryGames}
+            installedOnly={installedOnly}
+            onToggleInstalledOnly={() => setInstalledOnly((value) => !value)}
             hiddenCount={hiddenCount}
             showHidden={showHidden}
             runningIds={runningIds}
@@ -296,10 +308,10 @@ export function App() {
             onLaunch={(game) => void handleLaunch(game)}
           />
         )}
-        {view === "detail" && selectedGame && (
+        {view === "detail" && focusedGame && (
           <GameDetail
-            game={selectedGame}
-            status={launchStatus(selectedGame)}
+            game={focusedGame}
+            status={launchStatus(focusedGame)}
             onBack={() => navigate("library")}
             onLaunch={(game) => void handleLaunch(game)}
             onRename={() => setOverlay("rename")}
@@ -313,6 +325,7 @@ export function App() {
             games={library.games}
             scanning={library.loading}
             preferences={preferences}
+            updates={updates}
             onPreferencesChange={(next) => void updatePreferences(next)}
             onRescan={rescan}
             onKeysSaved={() => {
@@ -325,7 +338,7 @@ export function App() {
 
       {overlay === "palette" && (
         <CommandPalette
-          games={visibleGames}
+          games={libraryGames}
           hiddenCount={hiddenCount}
           showHidden={showHidden}
           onClose={() => setOverlay(null)}
@@ -343,9 +356,9 @@ export function App() {
 
       {overlay === "add" && <AddGameForm onAdded={handleAdded} onCancel={() => setOverlay(null)} />}
 
-      {overlay === "rename" && selectedGame && (
+      {overlay === "rename" && focusedGame && (
         <RenameForm
-          game={selectedGame}
+          game={focusedGame}
           onRenamed={(title) => {
             setOverlay(null);
             setNotice(`C'est noté, le jeu s'appelle ${title} maintenant.`);
@@ -355,12 +368,16 @@ export function App() {
         />
       )}
 
-      {overlay === "achievements" && selectedGame && (
+      {overlay === "achievements" && stageGame && (
         <AchievementsPanel
-          game={selectedGame}
+          game={stageGame}
           refreshKey={achievementsRefreshKey}
           onClose={() => setOverlay(null)}
         />
+      )}
+
+      {updates.state.kind === "ready" && (
+        <UpdateBanner version={updates.state.version} onRestart={updates.restart} />
       )}
 
       <div className="notice glass" role="status" aria-live="polite">

@@ -1,5 +1,7 @@
 use crate::config::Preferences;
+use crate::sources;
 use crate::state::{AppState, lock, update_config};
+use crate::tray;
 use serde::Serialize;
 use std::fs;
 use std::path::Path;
@@ -13,6 +15,7 @@ pub struct SettingsView {
     has_steam_grid_db_key: bool,
     has_steam_web_api_key: bool,
     preferences: Preferences,
+    game_folders: Vec<String>,
 }
 
 #[tauri::command]
@@ -22,6 +25,10 @@ pub fn get_settings(state: State<'_, AppState>) -> Result<SettingsView, String> 
         has_steam_grid_db_key: config.steam_grid_db_api_key.is_some(),
         has_steam_web_api_key: config.steam_web_api_key.is_some(),
         preferences: config.preferences,
+        game_folders: sources::game_folders(&state.home, &config)
+            .iter()
+            .map(|folder| folder.to_string_lossy().into_owned())
+            .collect(),
     })
 }
 
@@ -62,6 +69,32 @@ pub fn save_preferences(
     })
 }
 
+const MAX_GAME_FOLDERS: usize = 20;
+
+#[tauri::command]
+pub fn save_game_folders(folders: Vec<String>, state: State<'_, AppState>) -> Result<(), String> {
+    if folders.len() > MAX_GAME_FOLDERS {
+        return Err("Ça fait beaucoup de dossiers, garde les principaux.".to_string());
+    }
+    let mut validated: Vec<std::path::PathBuf> = Vec::new();
+    for folder in folders {
+        let path = std::path::PathBuf::from(folder.trim());
+        if !path.is_absolute() || !path.is_dir() {
+            return Err(format!("{} n'est pas un dossier.", path.display()));
+        }
+        if path == state.home || path == std::path::Path::new("/") {
+            return Err("Choisis un dossier de jeux, pas tout le disque.".to_string());
+        }
+        if !validated.contains(&path) {
+            validated.push(path);
+        }
+    }
+    update_config(&state, |config| {
+        config.game_folders = Some(validated);
+        Ok(())
+    })
+}
+
 fn set_launch_at_login(home: &Path, enabled: bool) -> Result<(), String> {
     let entry_path = home.join(".config/autostart/konsol.desktop");
     if !enabled {
@@ -72,11 +105,15 @@ fn set_launch_at_login(home: &Path, enabled: bool) -> Result<(), String> {
             _ => Ok(()),
         };
     }
-    let executable = std::env::current_exe()
-        .map_err(|error| format!("Impossible de trouver Konsol : {error}"))?;
+    let executable = match std::env::var_os("APPIMAGE") {
+        Some(appimage) => std::path::PathBuf::from(appimage),
+        None => std::env::current_exe()
+            .map_err(|error| format!("Impossible de trouver Konsol : {error}"))?,
+    };
     let entry = format!(
-        "[Desktop Entry]\nType=Application\nName=Konsol\nExec=\"{}\"\nIcon=konsol\nX-GNOME-Autostart-enabled=true\n",
-        executable.display()
+        "[Desktop Entry]\nType=Application\nName=Konsol\nExec=\"{}\" {}\nIcon=konsol\nX-GNOME-Autostart-enabled=true\n",
+        executable.display(),
+        tray::autostart_arguments()
     );
     entry_path
         .parent()

@@ -131,7 +131,7 @@ export function CommandPalette({
                 </span>
               </button>
               <button type="button" className="palette-launch" onClick={() => onLaunch(game)}>
-                Lancer
+                {game.installed ? "Lancer" : "Installer"}
               </button>
             </li>
           ))}

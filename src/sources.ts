@@ -10,3 +10,12 @@ export const SOURCE_LABELS: Record<GameSource, string> = {
   desktop: "Sans launcher",
   manual: "Ajoutés à la main",
 };
+
+export const SOURCE_LAUNCHERS: Record<GameSource, string> = {
+  steam: "Steam",
+  gog: "Heroic",
+  epic: "Heroic",
+  amazon: "Heroic",
+  desktop: "Konsol",
+  manual: "Konsol",
+};

@@ -1,12 +1,15 @@
 use crate::game::{
     AchievementSource, Game, GameDetails, GameSource, ImageSource, LaunchTarget, ProcessMarker,
 };
+use crate::metadata::OwnedApp;
 use crate::vdf::{self, VdfValue};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 const FULLY_INSTALLED_FLAG: u32 = 4;
+const STORE_ASSETS_URL: &str =
+    "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps";
 const ICON_SIZES: [&str; 6] = ["256x256", "128x128", "96x96", "64x64", "48x48", "32x32"];
 const TOOL_NAME_PREFIXES: [&str; 3] = [
     "Proton",
@@ -27,6 +30,61 @@ pub fn scan(home: &Path) -> Vec<Game> {
         .iter()
         .flat_map(|library| manifests_in(&library.join("steamapps")))
         .filter_map(|manifest| game_from_manifest(&manifest, &steam_root, home, &playtimes))
+        .collect()
+}
+
+pub fn watched_paths(home: &Path) -> Vec<PathBuf> {
+    library_paths(&home.join(".local/share/Steam"))
+        .into_iter()
+        .map(|library| library.join("steamapps"))
+        .collect()
+}
+
+pub fn logged_in_steam_id(home: &Path) -> Option<String> {
+    let content = fs::read_to_string(home.join(".local/share/Steam/config/loginusers.vdf")).ok()?;
+    let root = vdf::parse(&content);
+    let users = root.get("users")?.entries();
+    let is_steam_id = |id: &&String| id.len() == 17 && id.chars().all(|c| c.is_ascii_digit());
+    users
+        .iter()
+        .find(|(id, user)| is_steam_id(&id) && user.get_text("MostRecent") == Some("1"))
+        .or_else(|| users.iter().find(|(id, _)| is_steam_id(&id)))
+        .map(|(id, _)| id.clone())
+}
+
+pub fn owned_not_installed(owned: &[OwnedApp], installed_ids: &HashSet<String>) -> Vec<Game> {
+    owned
+        .iter()
+        .filter(|app| !installed_ids.contains(&format!("steam:{}", app.app_id)))
+        .filter(|app| !is_steam_tool(&app.name))
+        .map(|app| {
+            let app_id = app.app_id.to_string();
+            let asset =
+                |file: &str| ImageSource::Url(format!("{STORE_ASSETS_URL}/{app_id}/{file}"));
+            Game {
+                id: format!("steam:{app_id}"),
+                title: app.name.clone(),
+                source: GameSource::Steam,
+                cover: Some(asset("library_600x900.jpg")),
+                hero: Some(asset("library_hero.jpg")),
+                accent: None,
+                hidden: false,
+                installed: false,
+                achievements: None,
+                details: GameDetails {
+                    playtime_minutes: Some(app.playtime_minutes),
+                    last_played: (app.last_played > 0).then_some(app.last_played),
+                    ..GameDetails::default()
+                },
+                launch: LaunchTarget::SteamApp(app_id.clone()),
+                process_marker: ProcessMarker::EnvVar {
+                    name: "SteamAppId",
+                    value: app_id,
+                },
+                icon_source: None,
+                achievement_source: None,
+            }
+        })
         .collect()
 }
 
@@ -159,6 +217,7 @@ fn game_from_manifest(
         cover,
         accent: None,
         hidden: false,
+        installed: true,
         achievements: None,
         details,
         launch: LaunchTarget::SteamApp(app_id.to_string()),

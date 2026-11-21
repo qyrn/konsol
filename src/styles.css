@@ -651,23 +651,6 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
-.home-footer {
-  position: absolute;
-  inset: auto 0 26px;
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  font-size: 13px;
-  color: rgb(244 246 255 / 0.5);
-  white-space: nowrap;
-}
-
-.home-position {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: rgb(244 246 255 / 0.8);
-}
-
 .now-playing {
   display: flex;
   flex: 1;
@@ -1735,6 +1718,24 @@ kbd {
   font-size: 22px;
 }
 
+.update-banner {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 10px 10px 20px;
+  border-radius: 999px;
+  background: rgb(16 19 32 / 0.88);
+  font-weight: 600;
+}
+
+.about-row > div {
+  flex: 1;
+}
+
 .notice {
   position: fixed;
   bottom: 64px;
@@ -1766,6 +1767,59 @@ kbd {
   background: rgb(5 6 12 / 0.55);
   font-size: 11px;
   font-weight: 700;
+}
+
+.shelf-item[data-installed="false"] .cover {
+  filter: saturate(0.55) brightness(0.75);
+}
+
+.shelf-item[data-installed="false"] .shelf-badge {
+  background: rgb(5 6 12 / 0.75);
+  color: var(--text-muted);
+}
+
+.shelf-entry {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  width: 150px;
+}
+
+.shelf-caption {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text-muted);
+}
+
+.shelf-suggestions h2 span {
+  font-size: 14px;
+}
+
+.library-filters {
+  display: flex;
+  gap: 8px;
+}
+
+.folder-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+}
+
+.folder-row + .folder-row {
+  border-top: 1px solid rgb(255 255 255 / 0.07);
+}
+
+.folder-row .field-button {
+  padding: 8px 14px;
+}
+
+.source-row-empty {
+  padding: 16px 0;
+  color: var(--text-muted);
 }
 
 .shelf-item[data-running="true"] .shelf-badge {

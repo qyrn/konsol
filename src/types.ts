@@ -10,6 +10,7 @@ export interface Game {
   hero: ImageSource | null;
   accent: string | null;
   hidden: boolean;
+  installed: boolean;
   achievements: AchievementSummary | null;
   details: GameDetails;
 }
@@ -21,6 +22,7 @@ export interface GameDetails {
   developer: string | null;
   year: number | null;
   genre: string | null;
+  genres: string[];
   location: string | null;
 }
 
@@ -42,6 +44,7 @@ export interface Achievement {
 export interface Preferences {
   launchAtLogin: boolean;
   minimizeDuringSession: boolean;
+  keepRunningInBackground: boolean;
   accentFollowsGame: boolean;
   reduceMotion: boolean;
 }
@@ -50,6 +53,7 @@ export interface Settings {
   hasSteamGridDbKey: boolean;
   hasSteamWebApiKey: boolean;
   preferences: Preferences;
+  gameFolders: string[];
 }
 
 export interface NewManualGame {

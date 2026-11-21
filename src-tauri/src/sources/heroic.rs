@@ -14,6 +14,7 @@ struct StoreEntry {
     hero_url: Option<String>,
     developer: Option<String>,
     genre: Option<String>,
+    is_dlc: bool,
 }
 
 struct InstalledGame {
@@ -94,7 +95,61 @@ fn scan_store(
     playtimes: &HashMap<String, Playtime>,
 ) -> Vec<Game> {
     let library = read_library(&heroic_dir.join(store.library_file));
-    (store.installed)(heroic_dir)
+    let installed = (store.installed)(heroic_dir);
+    let installed_names: Vec<String> = installed.iter().map(|game| game.app_name.clone()).collect();
+    let mut games = installed_games(heroic_dir, store, playtimes, &library, installed);
+    games.extend(
+        library
+            .iter()
+            .filter(|(app_name, entry)| {
+                !entry.is_dlc && is_safe_app_name(app_name) && !installed_names.contains(app_name)
+            })
+            .map(|(app_name, entry)| {
+                let playtime = playtimes.get(app_name).copied().unwrap_or_default();
+                Game {
+                    id: format!("{}:{app_name}", store.runner),
+                    title: entry.title.clone(),
+                    source: store.source,
+                    cover: entry
+                        .cover_url
+                        .as_deref()
+                        .map(|url| cached_image(heroic_dir, url)),
+                    hero: entry
+                        .hero_url
+                        .as_deref()
+                        .map(|url| cached_image(heroic_dir, url)),
+                    accent: None,
+                    hidden: false,
+                    installed: false,
+                    achievements: None,
+                    details: GameDetails {
+                        playtime_minutes: Some(playtime.minutes),
+                        last_played: playtime.last_played,
+                        developer: entry.developer.clone(),
+                        genre: entry.genre.clone(),
+                        ..GameDetails::default()
+                    },
+                    launch: LaunchTarget::Heroic {
+                        runner: store.runner,
+                        app_name: app_name.clone(),
+                    },
+                    process_marker: ProcessMarker::Mentions(format!("appName={app_name}")),
+                    icon_source: None,
+                    achievement_source: None,
+                }
+            }),
+    );
+    games
+}
+
+fn installed_games(
+    heroic_dir: &Path,
+    store: &Store,
+    playtimes: &HashMap<String, Playtime>,
+    library: &HashMap<String, StoreEntry>,
+    installed: Vec<InstalledGame>,
+) -> Vec<Game> {
+    installed
         .into_iter()
         .filter(|installed| is_safe_app_name(&installed.app_name))
         .filter_map(|installed| {
@@ -133,6 +188,7 @@ fn scan_store(
                 hero,
                 accent: None,
                 hidden: false,
+                installed: true,
                 achievements: None,
                 details,
                 achievement_source: (store.source == GameSource::Gog).then(|| {
@@ -214,12 +270,17 @@ fn read_library(path: &Path) -> HashMap<String, StoreEntry> {
                 cover_url: https_field(game, &["art_square", "art_cover"]),
                 hero_url: https_field(game, &["art_background", "art_cover"]),
                 developer: text_field(game, "developer"),
+                is_dlc: game
+                    .get("install")
+                    .and_then(|install| install.get("is_dlc"))
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
                 genre: game
                     .get("extra")
                     .and_then(|extra| extra.get("genres"))
                     .and_then(|genres| genres.get(0))
                     .and_then(Value::as_str)
-                    .map(str::to_string),
+                    .map(french_genre),
             };
             Some((app_name, entry))
         })
@@ -292,6 +353,25 @@ fn installed_amazon(heroic_dir: &Path) -> Vec<InstalledGame> {
             })
         })
         .collect()
+}
+
+fn french_genre(genre: &str) -> String {
+    let translated = match genre {
+        "Adventure" => "Aventure",
+        "Role-playing (RPG)" | "Role-playing" => "RPG",
+        "Shooter" => "Tir",
+        "Strategy" => "Stratégie",
+        "Racing" => "Course",
+        "Sports" => "Sport",
+        "Puzzle" => "Réflexion",
+        "Platformer" => "Plateforme",
+        "Fighting" => "Combat",
+        "Point-and-click" => "Point & click",
+        "Survival" => "Survie",
+        "Horror" => "Horreur",
+        other => other,
+    };
+    translated.to_string()
 }
 
 fn size_in_bytes(value: &Value) -> Option<u64> {

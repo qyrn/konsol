@@ -29,6 +29,7 @@ pub fn start(app: AppHandle) {
             let state = app.state::<AppState>();
             let watched: Vec<WatchedGame> = lock(&state.games)
                 .values()
+                .filter(|game| game.installed)
                 .map(|game| WatchedGame {
                     id: game.id.clone(),
                     marker: game.process_marker.clone(),

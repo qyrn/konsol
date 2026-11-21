@@ -1,5 +1,5 @@
 use crate::desktop_file::{self, DesktopFile};
-use crate::game::{AchievementSource, Game, GameSource, LaunchTarget};
+use crate::game::{AchievementSource, Game, GameSource, LaunchTarget, ProcessMarker};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -49,7 +49,8 @@ fn game_from_entry(stem: &str, entry: DesktopFile) -> Option<Game> {
             working_directory,
         },
     );
-    game.details.location = Some(location);
+    game.details.location = Some(location.clone());
+    let mut game = game.also_running_when(ProcessMarker::Mentions(location));
     game.achievement_source = target
         .parent()
         .map(|directory| directory.join(EMULATOR_STATS_FILE))

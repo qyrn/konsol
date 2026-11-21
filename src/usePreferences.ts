@@ -5,6 +5,7 @@ import type { Preferences } from "./types";
 export const DEFAULT_PREFERENCES: Preferences = {
   launchAtLogin: false,
   minimizeDuringSession: false,
+  keepRunningInBackground: true,
   accentFollowsGame: true,
   reduceMotion: false,
 };

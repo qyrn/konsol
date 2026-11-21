@@ -46,6 +46,7 @@ pub enum LaunchTarget {
 pub enum ProcessMarker {
     EnvVar { name: &'static str, value: String },
     Mentions(String),
+    AnyOf(Vec<ProcessMarker>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -70,6 +71,7 @@ pub struct GameDetails {
     pub developer: Option<String>,
     pub year: Option<u16>,
     pub genre: Option<String>,
+    pub genres: Vec<String>,
     pub location: Option<String>,
 }
 
@@ -83,6 +85,7 @@ pub struct Game {
     pub hero: Option<ImageSource>,
     pub accent: Option<String>,
     pub hidden: bool,
+    pub installed: bool,
     pub achievements: Option<AchievementSummary>,
     pub details: GameDetails,
     #[serde(skip)]
@@ -116,12 +119,18 @@ impl Game {
             hero: None,
             accent: None,
             hidden: false,
+            installed: true,
             achievements: None,
             details: GameDetails::default(),
             launch,
             icon_source: None,
             achievement_source: None,
         }
+    }
+
+    pub fn also_running_when(mut self, marker: ProcessMarker) -> Self {
+        self.process_marker = ProcessMarker::AnyOf(vec![self.process_marker, marker]);
+        self
     }
 
     pub fn playtime_tracked_by_konsol(&self) -> bool {

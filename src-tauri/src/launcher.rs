@@ -5,7 +5,11 @@ use std::process::{Command, Stdio};
 use std::thread;
 
 pub fn launch(game: &Game) -> Result<(), String> {
-    let arguments = command_line(&game.launch);
+    let arguments = if game.installed {
+        command_line(&game.launch)
+    } else {
+        install_command_line(&game.launch)?
+    };
     let (program, rest) = arguments
         .split_first()
         .ok_or("Ce jeu n'a pas de commande de lancement.")?;
@@ -41,6 +45,21 @@ pub fn command_line(target: &LaunchTarget) -> Vec<String> {
         ],
         LaunchTarget::Program(path) => vec![path.to_string_lossy().into_owned()],
         LaunchTarget::Command { arguments, .. } => arguments.clone(),
+    }
+}
+
+fn install_command_line(target: &LaunchTarget) -> Result<Vec<String>, String> {
+    match target {
+        LaunchTarget::SteamApp(app_id) => {
+            Ok(vec!["steam".into(), format!("steam://install/{app_id}")])
+        }
+        LaunchTarget::Heroic { runner, app_name } => Ok(vec![
+            "heroic".into(),
+            format!("heroic://launch?appName={app_name}&runner={runner}"),
+        ]),
+        LaunchTarget::Program(_) | LaunchTarget::Command { .. } => {
+            Err("Ce jeu n'est pas installé.".to_string())
+        }
     }
 }
 

@@ -69,7 +69,7 @@ export function GameDetail({
         <p className="detail-meta">{meta.length > 0 ? meta.join(" · ") : SOURCE_LABELS[game.source]}</p>
         <h1 className={`detail-title ${titleSizeClass(game.title)}`}>{game.title}</h1>
         <div className="stage-actions detail-actions">
-          <LaunchButton status={status} onLaunch={() => onLaunch(game)} />
+          <LaunchButton status={status} installed={game.installed} onLaunch={() => onLaunch(game)} />
           <button type="button" className="glass-button" onClick={onRename}>
             Renommer
           </button>
