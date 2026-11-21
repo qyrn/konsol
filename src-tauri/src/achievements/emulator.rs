@@ -1,4 +1,5 @@
 use super::{Achievement, AchievementList, SchemaEntry};
+use crate::steam_cdn::community_image;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -19,7 +20,7 @@ pub fn read(path: &Path, schema: Option<&[SchemaEntry]>) -> Option<AchievementLi
                     &entry.api_name,
                     entry.name.clone(),
                     entry.description.clone(),
-                    entry.icon_url.clone(),
+                    entry.icon_url.as_deref().map(community_image),
                     state,
                 )
             })

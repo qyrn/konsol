@@ -4,8 +4,7 @@ use crate::vdf::VdfValue;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const ICON_BASE_URL: &str =
-    "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps";
+use crate::steam_cdn::COMMUNITY_IMAGES_URL as ICON_BASE_URL;
 
 fn stats_directory(home: &Path) -> PathBuf {
     home.join(".local/share/Steam/appcache/stats")
