@@ -118,6 +118,19 @@ impl PlaytimeStore {
         imported
     }
 
+    pub fn intervals_since(&self, since: i64) -> Vec<(String, i64, i64)> {
+        self.stored
+            .intervals
+            .iter()
+            .flat_map(|(game_id, intervals)| {
+                intervals
+                    .iter()
+                    .filter(move |(_, end)| *end >= since)
+                    .map(move |(start, end)| (game_id.clone(), *start, *end))
+            })
+            .collect()
+    }
+
     pub fn save(&self) {
         if let Some(directory) = self.path.parent()
             && fs::create_dir_all(directory).is_ok()

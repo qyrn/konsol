@@ -1,3 +1,4 @@
+pub mod discover;
 mod disk_usage;
 pub mod http;
 mod steam_catalog;
@@ -41,7 +42,7 @@ pub struct GameMetadata {
     pub store_lookup_done: bool,
     pub grid_lookup_done: bool,
     pub schema_lookup_done: bool,
-    pub catalog_v2_done: bool,
+    pub catalog_v3_done: bool,
     pub size_lookup_done: bool,
     pub rarity_lookup_done: bool,
 }
@@ -259,9 +260,9 @@ fn pending_steps(game: &Game, metadata: &GameMetadata, keys: &ApiKeys) -> Pendin
             && keys.steam_web.is_some()
             && !metadata.schema_lookup_done
             && (metadata.steam_app_id.is_some() || app_id_pending),
-        catalog_lookup: !metadata.catalog_v2_done && (app_id_known || app_id_pending),
+        catalog_lookup: !metadata.catalog_v3_done && (app_id_known || app_id_pending),
         grid_cover_lookup: keys.steam_grid_db.is_some()
-            && metadata.catalog_v2_done
+            && metadata.catalog_v3_done
             && !metadata.has_real_store_cover()
             && !metadata.grid_cover_done
             && app_id_known
@@ -360,7 +361,7 @@ pub fn catalog_requests(games: &[Game], store: &MetadataStore) -> Vec<(String, u
         .iter()
         .filter_map(|game| {
             let metadata = store.get(&game.id).cloned().unwrap_or_default();
-            if metadata.catalog_v2_done {
+            if metadata.catalog_v3_done {
                 return None;
             }
             metadata
@@ -401,12 +402,13 @@ pub fn fetch_catalog(
                             .iter()
                             .filter_map(|(id, weight)| {
                                 Some(TagWeight {
+                                    id: *id,
                                     name: tags.names.get(id)?.clone(),
                                     weight: *weight,
                                 })
                             })
                             .collect();
-                        metadata.catalog_v2_done = true;
+                        metadata.catalog_v3_done = true;
                         Some((game_id.clone(), metadata))
                     })
                     .collect(),

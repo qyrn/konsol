@@ -11,6 +11,7 @@ interface CoverCarouselProps {
   onLaunch: (game: Game) => void;
   onPrevious: () => void;
   onNext: () => void;
+  onMenu: (game: Game, x: number, y: number) => void;
 }
 
 function placement(distance: number, accent: string): CSSProperties {
@@ -31,6 +32,7 @@ export function CoverCarousel({
   onLaunch,
   onPrevious,
   onNext,
+  onMenu,
 }: CoverCarouselProps) {
   const selectedIndex = Math.max(
     0,
@@ -53,6 +55,10 @@ export function CoverCarousel({
             style={placement(distance, game.accent ?? DEFAULT_ACCENT)}
             onClick={() => onSelect(game)}
             onDoubleClick={() => onLaunch(game)}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              onMenu(game, event.clientX, event.clientY);
+            }}
           >
             <CoverImage game={game} />
           </button>

@@ -6,6 +6,7 @@ import {
   launchGame,
   removeManualGame,
   setGameHidden,
+  addPlaytime,
   stopGame,
   uninstallGame,
 } from "./api";
@@ -13,6 +14,8 @@ import { AchievementsPanel } from "./components/AchievementsPanel";
 import { AddGameForm } from "./components/AddGameForm";
 import { AchievementsPage } from "./components/AchievementsPage";
 import { Backdrop } from "./components/Backdrop";
+import { GameMenu, type GameMenuPosition } from "./components/GameMenu";
+import { TextPrompt } from "./components/TextPrompt";
 import { CenteredStage } from "./components/CenteredStage";
 import { CommandPalette } from "./components/CommandPalette";
 import { CoverCarousel } from "./components/CoverCarousel";
@@ -30,6 +33,9 @@ import type { LaunchStatus } from "./launchStatus";
 import type { Game } from "./types";
 import { useLibrary } from "./useLibrary";
 import { usePreferences } from "./usePreferences";
+import { isOldGame } from "./oldGames";
+import { useCollections } from "./useCollections";
+import { useGamepad } from "./useGamepad";
 import { useStableCallback } from "./useStableCallback";
 import { useUpdater } from "./useUpdater";
 import { UpdateBanner } from "./components/UpdateBanner";
@@ -39,6 +45,7 @@ import { useTauriEvent } from "./useTauriEvent";
 import { type Overlay, VIEW_VEIL, type View } from "./views";
 
 const NOTICE_DURATION_MS = 4000;
+const GAMEPAD_TABS: View[] = ["home", "library", "achievements", "settings"];
 const LAUNCH_TIMEOUT_MS = 90000;
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -59,6 +66,62 @@ export function App() {
   const [stoppingId, setStoppingId] = useState<string | null>(null);
   const updates = useUpdater();
   const { preferences, update: updatePreferences } = usePreferences(setNotice);
+  const collectionStore = useCollections(setNotice);
+  const [menu, setMenu] = useState<GameMenuPosition | null>(null);
+  const [prompt, setPrompt] = useState<{ kind: "collection" | "playtime"; game: Game } | null>(null);
+  const openMenu = useStableCallback((game: Game, x: number, y: number) => setMenu({ game, x, y }));
+
+  useEffect(() => {
+    function blockNativeMenu(event: MouseEvent) {
+      if (!(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)) {
+        event.preventDefault();
+      }
+    }
+    window.addEventListener("contextmenu", blockNativeMenu);
+    return () => window.removeEventListener("contextmenu", blockNativeMenu);
+  }, []);
+
+  useGamepad({
+    onHorizontal: (step) => {
+      if (!overlay && view === "home") selectBy(step);
+    },
+    onConfirm: () => {
+      if (overlay) return;
+      if (view === "home" && selectedGame) void handleLaunch(selectedGame);
+      if (view === "detail" && focusedGame) void handleLaunch(focusedGame);
+    },
+    onBack: () => {
+      if (menu) setMenu(null);
+      else if (overlay) setOverlay(null);
+      else if (view === "detail") navigate("library");
+      else navigate("home");
+    },
+    onDetail: () => {
+      if (!overlay && view === "home" && selectedGame) openGame(selectedGame);
+    },
+    onTab: (step) => {
+      const index = GAMEPAD_TABS.indexOf(view === "detail" ? "library" : view);
+      const next = GAMEPAD_TABS[(index + step + GAMEPAD_TABS.length) % GAMEPAD_TABS.length];
+      if (next) navigate(next);
+    },
+    onSearch: () => setOverlay((current) => (current === "palette" ? null : "palette")),
+  });
+
+  async function handleAddPlaytime(game: Game, value: string) {
+    const hours = Number(value.replace(",", "."));
+    if (!Number.isFinite(hours) || hours === 0) {
+      setNotice("Mets un nombre d'heures, genre 6 ou 1,5.");
+      return;
+    }
+    setPrompt(null);
+    try {
+      await addPlaytime(game.id, Math.round(hours * 60));
+      setNotice(`C'est noté, ${value} h de plus sur ${game.title}.`);
+      await library.reload();
+    } catch (error) {
+      setNotice(errorMessage(error));
+    }
+  }
 
   useTauriEvent(LIBRARY_EVENT, () => void library.reload());
   useTauriEvent(ACHIEVEMENT_EVENT, () => {
@@ -86,7 +149,10 @@ export function App() {
     () => library.games.filter((game) => showHidden || !game.hidden).sort(byMostRecent),
     [library.games, showHidden],
   );
-  const visibleGames = useMemo(() => libraryGames.filter((game) => game.installed), [libraryGames]);
+  const visibleGames = useMemo(() => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    return libraryGames.filter((game) => game.installed && !isOldGame(game, nowSeconds));
+  }, [libraryGames]);
   const hiddenCount = library.games.filter((game) => game.hidden).length;
   const selectedGame = visibleGames.find((game) => game.id === selectedId) ?? visibleGames[0] ?? null;
   const focusedGame = libraryGames.find((game) => game.id === selectedId) ?? selectedGame;
@@ -283,6 +349,7 @@ export function App() {
               onLaunch={(game) => void handleLaunch(game)}
               onPrevious={() => selectBy(-1)}
               onNext={() => selectBy(1)}
+              onMenu={openMenu}
             />
             <CenteredStage
               game={selectedGame}
@@ -323,6 +390,9 @@ export function App() {
         {view === "library" && (
           <Library
             games={libraryGames}
+            collections={collectionStore.collections}
+            onMenu={openMenu}
+            onError={setNotice}
             hiddenCount={hiddenCount}
             showHidden={showHidden}
             runningIds={runningIds}
@@ -389,6 +459,47 @@ export function App() {
       )}
 
       {overlay === "add" && <AddGameForm onAdded={handleAdded} onCancel={() => setOverlay(null)} />}
+
+      {menu && (
+        <GameMenu
+          menu={menu}
+          collections={collectionStore.collections}
+          onClose={() => setMenu(null)}
+          onLaunch={(game) => void handleLaunch(game)}
+          onOpen={openGame}
+          onToggleHidden={handleToggleHidden}
+          onUninstall={(game) => void handleUninstall(game)}
+          onToggleCollection={(name, game) => void collectionStore.toggleGame(name, game.id)}
+          onNewCollection={(game) => setPrompt({ kind: "collection", game })}
+          onAddPlaytime={(game) => setPrompt({ kind: "playtime", game })}
+        />
+      )}
+
+      {prompt?.kind === "collection" && (
+        <TextPrompt
+          title="Nouvelle collection"
+          help={`${prompt.game.title} sera dedans, tu ajoutes les autres avec un clic droit.`}
+          label="Nom"
+          submitLabel="Créer"
+          onSubmit={(name) => {
+            void collectionStore.create(name, prompt.game.id);
+            setPrompt(null);
+          }}
+          onCancel={() => setPrompt(null)}
+        />
+      )}
+
+      {prompt?.kind === "playtime" && (
+        <TextPrompt
+          title="Ajouter du temps de jeu"
+          help={`Pour les heures que Konsol a pas vues sur ${prompt.game.title}. Mets un nombre négatif pour en retirer.`}
+          label="Heures"
+          submitLabel="Ajouter"
+          inputMode="decimal"
+          onSubmit={(value) => void handleAddPlaytime(prompt.game, value)}
+          onCancel={() => setPrompt(null)}
+        />
+      )}
 
       {overlay === "rename" && focusedGame && (
         <RenameForm

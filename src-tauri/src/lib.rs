@@ -12,6 +12,7 @@ mod kde_history;
 mod launcher;
 mod library_watch;
 mod metadata;
+mod milestones;
 mod playtime;
 mod process;
 mod session_watch;
@@ -51,6 +52,7 @@ pub fn run() {
                 metadata: Mutex::new(MetadataStore::load(&cache_dir)),
                 playtime: Mutex::new(PlaytimeStore::load(&paths.app_data_dir()?)),
                 steam_library: SteamLibraryCache::new(&cache_dir),
+                cache_dir: cache_dir.clone(),
                 running: Mutex::new(Vec::new()),
                 journal: Mutex::new(Vec::new()),
                 enriching: AtomicBool::new(false),
@@ -76,6 +78,12 @@ pub fn run() {
             commands::manual::remove_manual_game,
             commands::achievements::get_achievements,
             commands::settings::get_settings,
+            commands::personal::get_collections,
+            commands::activity::recent_sessions,
+            commands::discover::discover_games,
+            commands::discover::open_store_page,
+            commands::personal::save_collections,
+            commands::personal::add_playtime,
             commands::settings::save_settings,
             commands::settings::save_preferences,
             commands::settings::save_game_folders

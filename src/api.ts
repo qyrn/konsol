@@ -1,5 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Achievement, Game, GameAchievements, NewManualGame, Preferences, Settings } from "./types";
+import type {
+  Achievement,
+  Collection,
+  Discovery,
+  Game,
+  GameAchievements,
+  NewManualGame,
+  Preferences,
+  SessionSpan,
+  Settings,
+} from "./types";
 
 export const LIBRARY_EVENT = "library-changed";
 export const ACHIEVEMENT_EVENT = "achievement-unlocked";
@@ -38,6 +48,30 @@ export function uninstallGame(id: string): Promise<void> {
 
 export function achievementOverview(): Promise<GameAchievements[]> {
   return invoke<GameAchievements[]>("achievement_overview");
+}
+
+export function getCollections(): Promise<Collection[]> {
+  return invoke<Collection[]>("get_collections");
+}
+
+export function saveCollections(collections: Collection[]): Promise<void> {
+  return invoke("save_collections", { collections });
+}
+
+export function addPlaytime(id: string, minutes: number): Promise<void> {
+  return invoke("add_playtime", { id, minutes });
+}
+
+export function recentSessions(): Promise<SessionSpan[]> {
+  return invoke<SessionSpan[]>("recent_sessions");
+}
+
+export function discoverGames(): Promise<Discovery[]> {
+  return invoke<Discovery[]>("discover_games");
+}
+
+export function openStorePage(appId: number): Promise<void> {
+  return invoke("open_store_page", { appId });
 }
 
 export function stopGame(id: string): Promise<void> {

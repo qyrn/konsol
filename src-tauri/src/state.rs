@@ -16,6 +16,7 @@ pub struct AppState {
     pub metadata: Mutex<MetadataStore>,
     pub playtime: Mutex<PlaytimeStore>,
     pub steam_library: SteamLibraryCache,
+    pub cache_dir: PathBuf,
     pub running: Mutex<Vec<String>>,
     pub journal: Mutex<Vec<JournalSession>>,
     pub enriching: AtomicBool,

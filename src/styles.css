@@ -711,6 +711,7 @@ kbd {
 }
 
 .now-playing-hint {
+  margin-bottom: 36px;
   font-size: 16px;
   color: var(--text-muted);
 }
@@ -1748,7 +1749,15 @@ kbd {
 }
 
 .chip-end {
+  display: flex;
+  flex: none;
+  gap: 8px;
   margin-left: auto;
+  padding-left: 8px;
+}
+
+.chip-collection {
+  border-style: dashed;
 }
 
 .library-band,
@@ -2094,6 +2103,146 @@ kbd {
 
 .game-progress-count {
   font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-menu {
+  position: fixed;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  min-width: 230px;
+  max-height: calc(100vh - 24px);
+  padding: 8px;
+  overflow-y: auto;
+  border: 1px solid var(--panel-edge);
+  border-radius: 16px;
+  background: rgb(16 19 32 / 0.98);
+  box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.9);
+}
+
+.game-menu button {
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.game-menu button:hover,
+.game-menu button:focus-visible {
+  background: rgb(255 255 255 / 0.1);
+  outline: none;
+}
+
+.game-menu button[aria-checked="true"]::after {
+  content: "✓";
+  float: right;
+  color: var(--accent);
+}
+
+.game-menu-title {
+  overflow: hidden;
+  padding: 6px 12px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.game-menu-label {
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.game-menu-separator {
+  height: 1px;
+  margin: 6px 4px;
+  background: rgb(255 255 255 / 0.1);
+}
+
+.wide-card-review {
+  font-size: 12px;
+  color: var(--found);
+}
+
+.week-recap h2 span {
+  font-size: 15px;
+  font-weight: 400;
+  font-stretch: 100%;
+  color: rgb(244 246 255 / 0.6);
+}
+
+.week-recap h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+
+.week-recap-body {
+  display: grid;
+  grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
+  gap: 40px;
+  align-items: end;
+}
+
+.week-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  height: 140px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.week-days li {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.week-bar {
+  width: 100%;
+  height: max(4px, var(--fill));
+  border-radius: 8px;
+  background: var(--accent);
+  box-shadow: 0 0 16px -4px var(--accent);
+}
+
+.week-day {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.week-games {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.week-games li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--item-accent);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.05);
+}
+
+.week-game-title {
+  font-weight: 600;
+}
+
+.week-game-time {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }

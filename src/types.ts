@@ -17,6 +17,7 @@ export interface Game {
 }
 
 export interface TagWeight {
+  id: number;
   name: string;
   weight: number;
 }
@@ -60,6 +61,25 @@ export interface GameAchievements {
   unlocked: number;
   total: number | null;
   recent: Achievement[];
+}
+
+export interface Collection {
+  name: string;
+  gameIds: string[];
+}
+
+export interface SessionSpan {
+  gameId: string;
+  startedAt: number;
+  endedAt: number;
+}
+
+export interface Discovery {
+  appId: number;
+  name: string;
+  capsule: string | null;
+  reviewLabel: string | null;
+  because: string;
 }
 
 export interface Settings {

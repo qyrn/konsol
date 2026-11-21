@@ -78,6 +78,8 @@ pub struct GameDetails {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TagWeight {
+    #[serde(default)]
+    pub id: u32,
     pub name: String,
     pub weight: u32,
 }

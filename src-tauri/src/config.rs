@@ -16,6 +16,15 @@ pub struct KonsolConfig {
     pub steam_web_api_key: Option<String>,
     pub preferences: Preferences,
     pub game_folders: Option<Vec<PathBuf>>,
+    pub collections: Vec<Collection>,
+    pub playtime_offsets: BTreeMap<String, i64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Collection {
+    pub name: String,
+    pub game_ids: Vec<String>,
 }
 
 impl KonsolConfig {

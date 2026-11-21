@@ -56,6 +56,12 @@ pub fn list_games(app: AppHandle, state: State<'_, AppState>) -> Result<Vec<Game
         (games, pending)
     };
     ignore_aborted_steam_launches(&mut games, &lock(&state.journal));
+    for game in &mut games {
+        if let Some(offset) = config.playtime_offsets.get(&game.id) {
+            let minutes = game.details.playtime_minutes.unwrap_or(0) as i64 + offset;
+            game.details.playtime_minutes = Some(minutes.max(0).unsigned_abs());
+        }
+    }
     fill_accents(&mut games, &state.accents);
     *lock(&state.games) = games
         .iter()

@@ -6,9 +6,10 @@ interface WideCardProps {
   game: Game;
   caption: string;
   onOpen: (game: Game) => void;
+  onMenu: (game: Game, x: number, y: number) => void;
 }
 
-export const WideCard = memo(function WideCard({ game, caption, onOpen }: WideCardProps) {
+export const WideCard = memo(function WideCard({ game, caption, onOpen, onMenu }: WideCardProps) {
   const capsule = imageUrl(game.capsule);
   const art = capsule ?? imageUrl(game.hero);
   return (
@@ -19,6 +20,10 @@ export const WideCard = memo(function WideCard({ game, caption, onOpen }: WideCa
       data-with-logo={capsule !== null}
       style={cssVariable("--item-accent", game.accent ?? DEFAULT_ACCENT)}
       onClick={() => onOpen(game)}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        onMenu(game, event.clientX, event.clientY);
+      }}
     >
       <span className="wide-card-picture">
         {art && <img src={art} alt="" loading="lazy" decoding="async" draggable={false} />}

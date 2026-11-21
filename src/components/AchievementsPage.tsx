@@ -3,6 +3,7 @@ import { achievementOverview, errorMessage } from "../api";
 import { DEFAULT_ACCENT, cssVariable } from "../images";
 import type { Achievement, Game, GameAchievements } from "../types";
 import { CoverImage } from "./CoverImage";
+import { WeekRecap } from "./WeekRecap";
 
 interface AchievementsPageProps {
   games: Game[];
@@ -81,6 +82,7 @@ export function AchievementsPage({ games, refreshKey, onOpenGame }: Achievements
           </dl>
         )}
       </header>
+      <WeekRecap games={games} refreshKey={refreshKey} />
       {error && (
         <p className="form-error" role="alert">
           {error}

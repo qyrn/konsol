@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { errorMessage, getAchievements } from "../api";
 import { rarityLabel } from "../format";
+import { MILESTONE_HOURS, milestoneTitle } from "../milestones";
 import { cssVariable } from "../images";
 import type { Achievement, Game } from "../types";
 import { CloseButton } from "./CloseButton";
@@ -48,9 +49,16 @@ export function AchievementsPanel({ game, refreshKey, onClose }: AchievementsPan
   }, [game.id, refreshKey]);
 
   const list = achievements ?? [];
-  const unlockedCount = list.filter((achievement) => achievement.unlocked).length;
-  const total =
-    game.achievements?.total ?? (achievements && achievements.length > 0 ? achievements.length : null);
+  const showMilestones = !game.achievements && (error !== null || achievements?.length === 0);
+  const reachedMilestones = MILESTONE_HOURS.filter(
+    (hours) => (game.details.playtimeMinutes ?? 0) >= hours * 60,
+  ).length;
+  const unlockedCount = showMilestones
+    ? reachedMilestones
+    : list.filter((achievement) => achievement.unlocked).length;
+  const total = showMilestones
+    ? MILESTONE_HOURS.length
+    : (game.achievements?.total ?? (achievements && achievements.length > 0 ? achievements.length : null));
   const progress = total ? Math.round((unlockedCount / total) * 100) : null;
   const counts: Record<AchievementFilter, number> = {
     all: list.length,
@@ -80,7 +88,7 @@ export function AchievementsPanel({ game, refreshKey, onClose }: AchievementsPan
           <span className="progress-fill" style={cssVariable("--progress", `${progress}%`)} />
         </span>
       )}
-      <div className="filter-pills" role="group" aria-label="Filtrer les succès">
+      <div className="filter-pills" role="group" aria-label="Filtrer les succès" hidden={showMilestones}>
         {(Object.keys(FILTER_LABELS) as AchievementFilter[]).map((key) => (
           <button
             key={key}
@@ -99,12 +107,34 @@ export function AchievementsPanel({ game, refreshKey, onClose }: AchievementsPan
           Les succès GOG viennent du cache de Heroic, ils se mettent à jour quand Heroic se synchronise.
         </p>
       )}
-      {error && (
+      {error && !showMilestones && (
         <p className="form-error" role="alert">
           {error}
         </p>
       )}
-      {achievements && achievements.length === 0 && <p className="panel-note">Aucun succès pour ce jeu.</p>}
+      {showMilestones && (
+        <>
+          <p className="panel-note">
+            Ce jeu a pas de succès, du coup Konsol t'en donne : un palier à chaque cap de temps de jeu, avec
+            une notification quand tu l'atteins.
+          </p>
+          <ul className="achievement-list">
+            {MILESTONE_HOURS.map((hours) => {
+              const reached = (game.details.playtimeMinutes ?? 0) >= hours * 60;
+              return (
+                <li key={hours} className="achievement" data-unlocked={reached}>
+                  <span className="achievement-icon achievement-icon-empty">{reached ? "✓" : ""}</span>
+                  <span className="achievement-text">
+                    <span className="achievement-name">{milestoneTitle(hours)}</span>
+                    <span className="achievement-description">Jouer {hours} h au total.</span>
+                  </span>
+                  <span className="achievement-date">{reached ? "Débloqué" : "Verrouillé"}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
       <ul className="achievement-list">
         {shown.map((achievement) => (
           <li key={achievement.id} className="achievement" data-unlocked={achievement.unlocked}>

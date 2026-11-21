@@ -1,6 +1,8 @@
+use crate::achievement_watch::send_notification;
 use crate::commands::library::LIBRARY_EVENT;
 use crate::game::{Game, KONSOL_GAME_ID_VARIABLE, ProcessMarker};
 use crate::journal_sessions;
+use crate::milestones;
 use crate::playtime::PlaySession;
 use crate::process;
 use crate::state::{AppState, lock};
@@ -34,6 +36,24 @@ fn playtime_marker(game: &Game) -> Option<ProcessMarker> {
         });
     }
     Some(game.process_marker.clone())
+}
+
+fn celebrate(state: &AppState, game_id: &str, hours: u64) {
+    let Some(game) = lock(&state.games).get(game_id).cloned() else {
+        return;
+    };
+    if game.achievement_source.is_some() {
+        return;
+    }
+    let icon = game.icon_source.as_ref().map_or_else(
+        || "konsol".to_string(),
+        |path| path.to_string_lossy().into_owned(),
+    );
+    send_notification(
+        &milestones::title(hours),
+        &format!("Palier Konsol atteint dans {}", game.title),
+        &icon,
+    );
 }
 
 fn import_external_sessions(app: &AppHandle, running: &HashSet<String>) -> bool {
@@ -132,7 +152,11 @@ pub fn start(app: AppHandle) {
                 session_starts.retain(|id, _| tracked_running.contains(&id.as_str()));
                 for id in &tracked_running {
                     let started_at = *session_starts.entry((*id).to_string()).or_insert(now);
+                    let before = playtime.get(id).map_or(0, |tracked| tracked.seconds);
                     playtime.add_tracked(id, elapsed, started_at, now);
+                    if let Some(hours) = milestones::crossed(before, before + elapsed) {
+                        celebrate(&state, id, hours);
+                    }
                 }
                 if session_ended
                     || (!tracked_running.is_empty() && last_save.elapsed() >= SAVE_EVERY)

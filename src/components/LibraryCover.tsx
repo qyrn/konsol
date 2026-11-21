@@ -9,6 +9,7 @@ interface LibraryCoverProps {
   running: boolean;
   onOpen: (game: Game) => void;
   onLaunch: (game: Game) => void;
+  onMenu: (game: Game, x: number, y: number) => void;
 }
 
 export const LibraryCover = memo(function LibraryCover({
@@ -16,6 +17,7 @@ export const LibraryCover = memo(function LibraryCover({
   running,
   onOpen,
   onLaunch,
+  onMenu,
 }: LibraryCoverProps) {
   const playtime = playtimeLabel(game.details.playtimeMinutes);
   return (
@@ -29,6 +31,10 @@ export const LibraryCover = memo(function LibraryCover({
       style={cssVariable("--item-accent", game.accent ?? DEFAULT_ACCENT)}
       onClick={() => onOpen(game)}
       onDoubleClick={() => onLaunch(game)}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        onMenu(game, event.clientX, event.clientY);
+      }}
     >
       <CoverImage game={game} />
       {game.installed ? (
