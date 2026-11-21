@@ -1,4 +1,5 @@
 use crate::game::{Game, LaunchTarget};
+use crate::launcher;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -85,21 +86,11 @@ fn single_line(value: &str) -> String {
 }
 
 fn exec_line(target: &LaunchTarget) -> String {
-    match target {
-        LaunchTarget::SteamApp(app_id) => {
-            format!(
-                "steam {}",
-                quote_argument(&format!("steam://rungameid/{app_id}"))
-            )
-        }
-        LaunchTarget::Heroic { runner, app_name } => format!(
-            "heroic {}",
-            quote_argument(&format!(
-                "heroic://launch?appName={app_name}&runner={runner}"
-            ))
-        ),
-        LaunchTarget::Program(path) => quote_argument(&path.to_string_lossy()),
-    }
+    launcher::command_line(target)
+        .iter()
+        .map(|argument| quote_argument(argument))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn quote_argument(argument: &str) -> String {
@@ -121,14 +112,14 @@ fn quote_argument(argument: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::{GameSource, ProcessMarker};
+    use crate::game::GameSource;
 
     #[test]
     fn builds_file_names_from_game_ids() {
         assert_eq!(file_stem("steam:250900"), "konsol-steam-250900");
         assert_eq!(
-            file_stem("script:Rockstar Launcher.sh"),
-            "konsol-script-rockstar-launcher-sh"
+            file_stem("desktop:Skate 3.Recomp"),
+            "konsol-desktop-skate-3-recomp"
         );
     }
 
@@ -139,7 +130,7 @@ mod tests {
                 runner: "gog",
                 app_name: "1423049311".into()
             }),
-            "heroic \"heroic://launch?appName=1423049311&runner=gog\""
+            "\"heroic\" \"--no-gui\" \"heroic://launch?appName=1423049311&runner=gog\""
         );
         assert_eq!(
             exec_line(&LaunchTarget::Program("/home/a b/50%$x.sh".into())),
@@ -149,24 +140,15 @@ mod tests {
 
     #[test]
     fn renders_a_complete_entry() {
-        let game = Game {
-            id: "steam:250900".into(),
-            title: "Isaac\nInjected=1".into(),
-            source: GameSource::Steam,
-            cover: None,
-            hero: None,
-            accent: None,
-            hidden: false,
-            launch: LaunchTarget::SteamApp("250900".into()),
-            process_marker: ProcessMarker::EnvVar {
-                name: "SteamAppId",
-                value: "250900".into(),
-            },
-            icon_source: None,
-        };
+        let game = Game::launched_by_konsol(
+            "steam:250900".into(),
+            "Isaac\nInjected=1".into(),
+            GameSource::Steam,
+            LaunchTarget::SteamApp("250900".into()),
+        );
         let entry = render(&game, "steam_app_250900", Path::new("/icons/isaac.png"));
         assert!(entry.contains("Name=Isaac Injected=1\n"));
         assert!(entry.contains("StartupWMClass=steam_app_250900\n"));
-        assert!(entry.contains("Exec=steam \"steam://rungameid/250900\"\n"));
+        assert!(entry.contains("Exec=\"steam\" \"-silent\" \"steam://rungameid/250900\"\n"));
     }
 }
