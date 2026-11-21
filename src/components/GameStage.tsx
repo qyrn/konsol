@@ -1,10 +1,11 @@
+import { LAUNCH_LABELS, type LaunchStatus } from "../launchStatus";
 import { SOURCE_LABELS } from "../sources";
 import { AchievementProgress } from "./AchievementProgress";
 import type { Game } from "../types";
 
 interface GameStageProps {
   game: Game;
-  launching: boolean;
+  status: LaunchStatus;
   onLaunch: (game: Game) => void;
   onToggleHidden: (game: Game) => void;
   onRemove: (game: Game) => void;
@@ -14,7 +15,7 @@ interface GameStageProps {
 
 export function GameStage({
   game,
-  launching,
+  status,
   onLaunch,
   onToggleHidden,
   onRemove,
@@ -29,8 +30,14 @@ export function GameStage({
       </h1>
       {game.achievements && <AchievementProgress summary={game.achievements} onOpen={onOpenAchievements} />}
       <div className="stage-actions">
-        <button type="button" className="launch-button" disabled={launching} onClick={() => onLaunch(game)}>
-          {launching ? "Ça se lance…" : "Lancer"}
+        <button
+          type="button"
+          className="launch-button"
+          data-status={status}
+          disabled={status !== "idle"}
+          onClick={() => onLaunch(game)}
+        >
+          {LAUNCH_LABELS[status]}
         </button>
         <button type="button" className="glass-button" onClick={onRename}>
           Renommer

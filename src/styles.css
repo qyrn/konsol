@@ -335,6 +335,7 @@ button:disabled {
 }
 
 .tray-item {
+  position: relative;
   display: block;
   width: 108px;
   padding: 0;
@@ -621,6 +622,42 @@ button:disabled {
   border: 1px solid var(--glass-edge);
   border-radius: 14px;
   background: rgb(255 255 255 / 0.06);
+}
+
+.launch-button[data-status="running"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  opacity: 1;
+}
+
+.launch-button[data-status="running"]::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  animation: running-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes running-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.tray-item[data-running="true"]::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgb(5 6 12 / 0.8);
+  border-radius: 50%;
+  background: var(--item-accent);
+  box-shadow: 0 0 10px var(--item-accent);
 }
 
 @media (prefers-reduced-motion: reduce) {

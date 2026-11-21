@@ -16,6 +16,10 @@ export function setGameHidden(id: string, hidden: boolean): Promise<void> {
   return invoke("set_game_hidden", { id, hidden });
 }
 
+export function runningGameIds(): Promise<string[]> {
+  return invoke<string[]>("running_game_ids");
+}
+
 export function renameGame(id: string, title: string): Promise<void> {
   return invoke("rename_game", { id, title });
 }

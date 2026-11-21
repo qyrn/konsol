@@ -17,10 +17,13 @@ import { RenameForm } from "./components/RenameForm";
 import { SettingsForm } from "./components/SettingsForm";
 import { DEFAULT_ACCENT, cssVariable } from "./images";
 import type { Game } from "./types";
+import type { LaunchStatus } from "./launchStatus";
 import { useLibrary } from "./useLibrary";
+import { useRunningGames } from "./useRunningGames";
 import { useTauriEvent } from "./useTauriEvent";
 
 const NOTICE_DURATION_MS = 4000;
+const LAUNCH_TIMEOUT_MS = 90000;
 
 function isTypingTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
@@ -33,6 +36,22 @@ export function App() {
   const [showHidden, setShowHidden] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [launchingId, setLaunchingId] = useState<string | null>(null);
+  const runningIds = useRunningGames();
+
+  useEffect(() => {
+    if (launchingId && runningIds.has(launchingId)) setLaunchingId(null);
+  }, [launchingId, runningIds]);
+
+  useEffect(() => {
+    if (!launchingId) return;
+    const timeout = window.setTimeout(() => setLaunchingId(null), LAUNCH_TIMEOUT_MS);
+    return () => window.clearTimeout(timeout);
+  }, [launchingId]);
+
+  function launchStatus(game: Game): LaunchStatus {
+    if (runningIds.has(game.id)) return "running";
+    return launchingId === game.id ? "launching" : "idle";
+  }
   const [notice, setNotice] = useState<string | null>(null);
   const [addingGame, setAddingGame] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -71,11 +90,11 @@ export function App() {
 
   async function handleLaunch(game: Game) {
     setSelectedId(game.id);
+    if (launchStatus(game) !== "idle") return;
     setLaunchingId(game.id);
     try {
       await launchGame(game.id);
       setNotice(`${game.title} se lance, ça peut prendre quelques secondes.`);
-      window.setTimeout(() => setLaunchingId(null), NOTICE_DURATION_MS);
     } catch (error) {
       setNotice(errorMessage(error));
       setLaunchingId(null);
@@ -177,7 +196,7 @@ export function App() {
         ) : selectedGame ? (
           <GameStage
             game={selectedGame}
-            launching={launchingId === selectedGame.id}
+            status={launchStatus(selectedGame)}
             onLaunch={(game) => void handleLaunch(game)}
             onToggleHidden={handleToggleHidden}
             onRemove={handleRemove}
@@ -193,6 +212,7 @@ export function App() {
         <GameTray
           games={visibleGames}
           selectedId={selectedGame?.id ?? null}
+          runningIds={runningIds}
           onSelect={(game) => setSelectedId(game.id)}
           onLaunch={(game) => void handleLaunch(game)}
         />

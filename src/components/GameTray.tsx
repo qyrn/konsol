@@ -6,11 +6,12 @@ import { CoverImage } from "./CoverImage";
 interface GameTrayProps {
   games: Game[];
   selectedId: string | null;
+  runningIds: ReadonlySet<string>;
   onSelect: (game: Game) => void;
   onLaunch: (game: Game) => void;
 }
 
-export function GameTray({ games, selectedId, onSelect, onLaunch }: GameTrayProps) {
+export function GameTray({ games, selectedId, runningIds, onSelect, onLaunch }: GameTrayProps) {
   const selectedRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export function GameTray({ games, selectedId, onSelect, onLaunch }: GameTrayProp
                 type="button"
                 className="tray-item"
                 data-hidden={game.hidden}
+                data-running={runningIds.has(game.id)}
                 aria-pressed={selected}
                 aria-label={game.title}
                 style={cssVariable("--item-accent", game.accent ?? DEFAULT_ACCENT)}

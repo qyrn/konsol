@@ -48,6 +48,7 @@ pub fn run() {
             commands::library::launch_game,
             commands::library::set_game_hidden,
             commands::library::rename_game,
+            commands::library::running_game_ids,
             commands::manual::add_manual_game,
             commands::manual::remove_manual_game,
             commands::achievements::get_achievements,

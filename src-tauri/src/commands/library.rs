@@ -3,9 +3,10 @@ use crate::achievements;
 use crate::artwork;
 use crate::commands::manual::validate_title;
 use crate::desktop_entry::DesktopPaths;
-use crate::game::Game;
+use crate::game::{Game, ProcessMarker};
 use crate::launcher;
 use crate::metadata::{self, ApiKeys};
+use crate::process;
 use crate::sources;
 use crate::state::{AppState, lock, update_config};
 use crate::window_watch;
@@ -134,4 +135,16 @@ pub fn rename_game(id: String, title: String, state: State<'_, AppState>) -> Res
     })?;
     lock(&state.metadata).forget(&id);
     Ok(())
+}
+
+#[tauri::command]
+pub fn running_game_ids(state: State<'_, AppState>) -> Vec<String> {
+    let markers: Vec<(String, ProcessMarker)> = lock(&state.games)
+        .values()
+        .map(|game| (game.id.clone(), game.process_marker.clone()))
+        .collect();
+    process::running_keys(&markers)
+        .into_iter()
+        .cloned()
+        .collect()
 }
