@@ -1,5 +1,6 @@
 use crate::commands::library::LIBRARY_EVENT;
-use crate::game::ProcessMarker;
+use crate::game::{Game, KONSOL_GAME_ID_VARIABLE, ProcessMarker};
+use crate::journal_sessions;
 use crate::process;
 use crate::state::{AppState, lock};
 use crate::time::now_unix;
@@ -12,10 +13,44 @@ const TICK: Duration = Duration::from_secs(2);
 const SAVE_EVERY: Duration = Duration::from_secs(60);
 const MAIN_WINDOW: &str = "main";
 
-struct WatchedGame {
-    id: String,
-    marker: ProcessMarker,
-    tracked_by_konsol: bool,
+const IMPORT_JOURNAL_EVERY: Duration = Duration::from_secs(60);
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Purpose {
+    Running,
+    Playtime,
+}
+
+fn playtime_marker(game: &Game) -> Option<ProcessMarker> {
+    if !game.playtime_tracked_by_konsol() {
+        return None;
+    }
+    if game.id.starts_with("desktop:") {
+        return Some(ProcessMarker::EnvVar {
+            name: KONSOL_GAME_ID_VARIABLE,
+            value: game.id.clone(),
+        });
+    }
+    Some(game.process_marker.clone())
+}
+
+fn import_menu_sessions(app: &AppHandle) -> bool {
+    let state = app.state::<AppState>();
+    let desktop_ids: HashSet<String> = lock(&state.games)
+        .keys()
+        .filter(|id| id.starts_with("desktop:"))
+        .cloned()
+        .collect();
+    if desktop_ids.is_empty() {
+        return false;
+    }
+    let sessions = journal_sessions::read();
+    let mut playtime = lock(&state.playtime);
+    let imported = playtime.import(&sessions, &desktop_ids);
+    if imported {
+        playtime.save();
+    }
+    imported
 }
 
 pub fn start(app: AppHandle) {
@@ -24,35 +59,42 @@ pub fn start(app: AppHandle) {
         let mut minimized_by_konsol = false;
         let mut last_tick = Instant::now();
         let mut last_save = Instant::now();
+        let mut last_import: Option<Instant> = None;
         loop {
             thread::sleep(TICK);
             let state = app.state::<AppState>();
-            let watched: Vec<WatchedGame> = lock(&state.games)
+            if last_import.is_none_or(|imported| imported.elapsed() >= IMPORT_JOURNAL_EVERY) {
+                last_import = Some(Instant::now());
+                if import_menu_sessions(&app) {
+                    let _ = app.emit(LIBRARY_EVENT, ());
+                }
+            }
+            let markers: Vec<((String, Purpose), ProcessMarker)> = lock(&state.games)
                 .values()
                 .filter(|game| game.installed)
-                .map(|game| WatchedGame {
-                    id: game.id.clone(),
-                    marker: game.process_marker.clone(),
-                    tracked_by_konsol: game.playtime_tracked_by_konsol(),
+                .flat_map(|game| {
+                    let running = (
+                        (game.id.clone(), Purpose::Running),
+                        game.process_marker.clone(),
+                    );
+                    let playtime = playtime_marker(game)
+                        .map(|marker| ((game.id.clone(), Purpose::Playtime), marker));
+                    std::iter::once(running).chain(playtime)
                 })
                 .collect();
-            let markers: Vec<(&WatchedGame, ProcessMarker)> = watched
+            let matched = process::running_keys(&markers);
+            let running: HashSet<String> = matched
                 .iter()
-                .map(|game| (game, game.marker.clone()))
+                .filter(|(_, purpose)| *purpose == Purpose::Running)
+                .map(|(id, _)| id.clone())
                 .collect();
-            let running_games: Vec<&WatchedGame> = process::running_keys(&markers)
-                .into_iter()
-                .copied()
-                .collect();
-            let running: HashSet<String> =
-                running_games.iter().map(|game| game.id.clone()).collect();
 
             let elapsed = last_tick.elapsed().min(TICK * 3).as_secs();
             last_tick = Instant::now();
-            let tracked_running: Vec<&str> = running_games
+            let tracked_running: Vec<&str> = matched
                 .iter()
-                .filter(|game| game.tracked_by_konsol)
-                .map(|game| game.id.as_str())
+                .filter(|(_, purpose)| *purpose == Purpose::Playtime)
+                .map(|(id, _)| id.as_str())
                 .collect();
             let session_ended = previously_running.difference(&running).next().is_some();
             {
