@@ -11,7 +11,7 @@ pub fn add_manual_game(
     title: String,
     executable: String,
     state: State<'_, AppState>,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let title = validate_title(&title)?;
     let executable = validate_executable(executable.trim())?;
     let id = format!("manual:{}", executable.display());
@@ -20,12 +20,13 @@ pub fn add_manual_game(
             return Err("Ce jeu est déjà dans la liste.".to_string());
         }
         config.manual_games.push(ManualGame {
-            id,
+            id: id.clone(),
             title,
             executable,
         });
         Ok(())
-    })
+    })?;
+    Ok(id)
 }
 
 #[tauri::command]

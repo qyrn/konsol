@@ -1,19 +1,39 @@
 import { imageUrl } from "../images";
 import type { Game } from "../types";
 
-export function Backdrop({ game }: { game: Game | null }) {
-  const heroUrl = imageUrl(game?.hero ?? null);
-  const coverUrl = imageUrl(game?.cover ?? null);
+interface BackdropProps {
+  games: Game[];
+  selectedId: string | null;
+  veil: number;
+}
+
+function BackdropLayer({ game, active }: { game: Game; active: boolean }) {
+  const heroUrl = imageUrl(game.hero);
+  const coverUrl = imageUrl(game.cover);
+  const source = heroUrl ?? coverUrl;
+  if (!source) return null;
 
   return (
+    <img
+      className="backdrop-layer"
+      data-active={active}
+      data-blurred={!heroUrl}
+      src={source}
+      alt=""
+      draggable={false}
+    />
+  );
+}
+
+export function Backdrop({ games, selectedId, veil }: BackdropProps) {
+  return (
     <div className="backdrop" aria-hidden="true">
-      {heroUrl ? (
-        <img key={heroUrl} className="backdrop-image" src={heroUrl} alt="" />
-      ) : coverUrl ? (
-        <img key={coverUrl} className="backdrop-image backdrop-image-blurred" src={coverUrl} alt="" />
-      ) : null}
-      <div className="backdrop-shade" />
+      {games.map((game) => (
+        <BackdropLayer key={game.id} game={game} active={game.id === selectedId} />
+      ))}
+      <div className="backdrop-vignette" />
       <div className="backdrop-glow" />
+      <div className="backdrop-veil" style={{ opacity: veil }} />
     </div>
   );
 }

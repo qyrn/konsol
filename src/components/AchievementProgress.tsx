@@ -1,4 +1,3 @@
-import { cssVariable } from "../images";
 import type { AchievementSummary } from "../types";
 
 interface AchievementProgressProps {
@@ -6,22 +5,18 @@ interface AchievementProgressProps {
   onOpen: () => void;
 }
 
+export function achievementCountLabel(summary: AchievementSummary): string {
+  return summary.total ? `${summary.unlocked} / ${summary.total}` : `${summary.unlocked}`;
+}
+
 export function AchievementProgress({ summary, onOpen }: AchievementProgressProps) {
-  const ratio = summary.total ? summary.unlocked / summary.total : null;
   const label = summary.total
-    ? `${summary.unlocked} / ${summary.total} succès`
+    ? `${achievementCountLabel(summary)} succès`
     : `${summary.unlocked} succès débloqués`;
 
   return (
-    <button type="button" className="achievement-progress glass" onClick={onOpen}>
-      <span className="achievement-progress-label">{label}</span>
-      {ratio !== null && (
-        <span
-          className="achievement-progress-bar"
-          style={cssVariable("--progress", `${Math.round(ratio * 100)}%`)}
-          aria-hidden="true"
-        />
-      )}
+    <button type="button" className="glass-button achievement-pill" onClick={onOpen}>
+      {label}
     </button>
   );
 }

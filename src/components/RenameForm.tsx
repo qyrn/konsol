@@ -1,6 +1,8 @@
-import { type FormEvent, type KeyboardEvent, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { errorMessage, renameGame } from "../api";
 import type { Game } from "../types";
+import { CloseButton } from "./CloseButton";
+import { Modal } from "./Modal";
 
 interface RenameFormProps {
   game: Game;
@@ -26,48 +28,42 @@ export function RenameForm({ game, onRenamed, onCancel }: RenameFormProps) {
     }
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLFormElement>) {
-    if (event.key === "Escape") onCancel();
-  }
-
   return (
-    <div className="modal-layer">
-      <form
-        className="add-form glass"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="rename-title"
-        onSubmit={handleSubmit}
-        onKeyDown={handleKeyDown}
-      >
-        <h2 id="rename-title">Renommer</h2>
-        <p className="add-form-help">
-          Konsol utilise ce nom pour chercher la jaquette, du coup mets le vrai nom du jeu.
-        </p>
-        <label>
-          Nom du jeu
-          <input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            maxLength={120}
-            required
-            autoFocus
-          />
-        </label>
+    <Modal labelledBy="rename-title" className="form-panel form-panel-narrow" onClose={onCancel}>
+      <form onSubmit={handleSubmit}>
+        <header className="form-panel-header">
+          <div>
+            <h2 id="rename-title">Renommer</h2>
+            <p>Konsol utilise ce nom pour chercher la jaquette, du coup mets le vrai nom du jeu.</p>
+          </div>
+          <CloseButton onClose={onCancel} />
+        </header>
+        <div className="form-fields">
+          <label>
+            Nom du jeu
+            <input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              maxLength={120}
+              required
+              autoFocus
+            />
+          </label>
+        </div>
         {error && (
           <p className="form-error" role="alert">
             {error}
           </p>
         )}
-        <div className="add-form-actions">
+        <div className="form-actions">
           <button type="button" className="glass-button" onClick={onCancel}>
             Annuler
           </button>
-          <button type="submit" className="launch-button" disabled={saving}>
+          <button type="submit" className="launch-button compact" disabled={saving}>
             Renommer
           </button>
         </div>
       </form>
-    </div>
+    </Modal>
   );
 }

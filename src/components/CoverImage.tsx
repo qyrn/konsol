@@ -1,15 +1,20 @@
 import { useState } from "react";
-import { imageUrl } from "../images";
+import { DEFAULT_ACCENT, cssVariable, imageUrl } from "../images";
+import { SOURCE_LABELS } from "../sources";
 import type { Game } from "../types";
 
 export function CoverImage({ game }: { game: Game }) {
-  const [failed, setFailed] = useState(false);
+  const [failedSource, setFailedSource] = useState<string | null>(null);
   const source = imageUrl(game.cover);
 
-  if (!source || failed) {
+  if (!source || failedSource === source) {
     return (
-      <span className="cover cover-typographic">
-        <span>{game.title}</span>
+      <span
+        className="cover cover-typographic"
+        style={cssVariable("--cover-accent", game.accent ?? DEFAULT_ACCENT)}
+      >
+        <span className="cover-source">{SOURCE_LABELS[game.source]}</span>
+        <span className="cover-title">{game.title}</span>
       </span>
     );
   }
@@ -21,7 +26,7 @@ export function CoverImage({ game }: { game: Game }) {
       alt=""
       loading="lazy"
       draggable={false}
-      onError={() => setFailed(true)}
+      onError={() => setFailedSource(source)}
     />
   );
 }
