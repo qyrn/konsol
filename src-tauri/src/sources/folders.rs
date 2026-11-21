@@ -51,10 +51,10 @@ const SKIPPED_FOLDERS: [&str; 27] = [
     "galaxy",
     "launcher",
     "ea app",
-    "electronic arts",
-    "ubisoft",
+    "social club",
+    "ea desktop",
     "epic games",
-    "rockstar games",
+    "uplay",
     "steam",
     "battle.net",
     "origin",
@@ -75,6 +75,14 @@ const SKIPPED_FOLDERS: [&str; 27] = [
     "prerequisites",
     "_commonredist",
     "traduction",
+];
+const PUBLISHER_FOLDERS: [&str; 6] = [
+    "rockstar games",
+    "electronic arts",
+    "ea games",
+    "ubisoft",
+    "bethesda softworks",
+    "2k games",
 ];
 const PREFIX_GAME_FOLDERS: [&str; 4] =
     ["Games", "GOG Games", "Program Files", "Program Files (x86)"];
@@ -128,6 +136,13 @@ fn visible_directories(path: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
+fn is_publisher(directory: &Path) -> bool {
+    directory
+        .file_name()
+        .map(|name| name.to_string_lossy().to_lowercase())
+        .is_some_and(|name| PUBLISHER_FOLDERS.contains(&name.as_str()))
+}
+
 fn drive_c(prefix: &Path) -> Option<PathBuf> {
     ["drive_c", "pfx/drive_c"]
         .iter()
@@ -143,6 +158,13 @@ fn game_folders(folder: &Path, depth: usize) -> Vec<GameFolder> {
                 PREFIX_GAME_FOLDERS
                     .iter()
                     .flat_map(|name| visible_directories(&drive.join(name)))
+                    .flat_map(|candidate| {
+                        if is_publisher(&candidate) {
+                            visible_directories(&candidate)
+                        } else {
+                            vec![candidate]
+                        }
+                    })
                     .map(|game_directory| GameFolder {
                         directory: game_directory,
                         wine_prefix: Some(directory.clone()),
@@ -235,8 +257,13 @@ fn main_executable(directory: &Path) -> Option<PathBuf> {
     executables(directory, 0)
         .into_iter()
         .max_by_key(|candidate| {
+            let starts_with_play = candidate
+                .path
+                .file_name()
+                .is_some_and(|name| name.to_string_lossy().to_lowercase().starts_with("play"));
             (
                 name_matches(candidate),
+                starts_with_play,
                 MAX_DEPTH - candidate.depth,
                 candidate.size,
             )
@@ -349,10 +376,27 @@ mod tests {
             b"MZ",
         );
         write_executable(&games.join("sims4-saves-backup/readme.txt"), b"x");
+        let rockstar = games.join("prefixes/rockstar/drive_c/Program Files/Rockstar Games");
+        write_executable(&rockstar.join("Grand Theft Auto V/PlayGTAV.exe"), b"MZ");
+        write_executable(
+            &rockstar.join("Grand Theft Auto V/GTA5.exe"),
+            b"MZ-bigger-binary",
+        );
+        write_executable(&rockstar.join("Launcher/Launcher.exe"), b"MZ");
 
         let found = scan(std::slice::from_ref(&games), &HashSet::new());
         let titles: Vec<&str> = found.iter().map(|game| game.title.as_str()).collect();
-        assert_eq!(found.len(), 2, "{titles:?}");
+        assert_eq!(found.len(), 3, "{titles:?}");
+        let gta = found
+            .iter()
+            .find(|game| game.title == "Grand Theft Auto V")
+            .expect("GTA V");
+        assert!(
+            gta.details
+                .location
+                .as_deref()
+                .is_some_and(|path| path.ends_with("PlayGTAV.exe"))
+        );
         assert!(titles.contains(&"Skate3 Recomp"));
         assert!(titles.contains(&"SSS2037"));
         let sss = found.iter().find(|game| game.title == "SSS2037").unwrap();
@@ -367,7 +411,7 @@ mod tests {
 
         let known: HashSet<PathBuf> =
             [fs::canonicalize(games.join("Skate3Recomp/Linux/skate3")).unwrap()].into();
-        assert_eq!(scan(&[games], &known).len(), 1);
+        assert_eq!(scan(&[games], &known).len(), 2);
         fs::remove_dir_all(root).unwrap();
     }
 
