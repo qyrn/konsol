@@ -12,6 +12,7 @@ struct StoreEntry {
     title: String,
     cover_url: Option<String>,
     hero_url: Option<String>,
+    capsule_url: Option<String>,
     developer: Option<String>,
     genre: Option<String>,
     is_dlc: bool,
@@ -114,6 +115,10 @@ fn scan_store(
                         .cover_url
                         .as_deref()
                         .map(|url| cached_image(heroic_dir, url)),
+                    capsule: entry
+                        .capsule_url
+                        .as_deref()
+                        .map(|url| cached_image(heroic_dir, url)),
                     hero: entry
                         .hero_url
                         .as_deref()
@@ -134,6 +139,7 @@ fn scan_store(
                         app_name: app_name.clone(),
                     },
                     process_marker: ProcessMarker::Mentions(format!("appName={app_name}")),
+                    install_command: None,
                     icon_source: None,
                     achievement_source: None,
                 }
@@ -183,9 +189,13 @@ fn installed_games(
                 id: format!("{}:{}", store.runner, installed.app_name),
                 title,
                 source: store.source,
+                install_command: None,
                 icon_source: cover.as_ref().and_then(ImageSource::local_path),
                 cover,
                 hero,
+                capsule: entry
+                    .and_then(|entry| entry.capsule_url.as_deref())
+                    .map(|url| cached_image(heroic_dir, url)),
                 accent: None,
                 hidden: false,
                 installed: true,
@@ -260,6 +270,7 @@ fn read_library(path: &Path) -> HashMap<String, StoreEntry> {
     };
     library
         .get("games")
+        .or_else(|| library.get("library"))
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
@@ -269,6 +280,7 @@ fn read_library(path: &Path) -> HashMap<String, StoreEntry> {
                 title: text_field(game, "title")?,
                 cover_url: https_field(game, &["art_square", "art_cover"]),
                 hero_url: https_field(game, &["art_background", "art_cover"]),
+                capsule_url: https_field(game, &["art_cover"]),
                 developer: text_field(game, "developer"),
                 is_dlc: game
                     .get("install")
