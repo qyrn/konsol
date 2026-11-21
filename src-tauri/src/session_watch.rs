@@ -1,10 +1,12 @@
 use crate::commands::library::LIBRARY_EVENT;
 use crate::game::{Game, KONSOL_GAME_ID_VARIABLE, ProcessMarker};
 use crate::journal_sessions;
+use crate::playtime::PlaySession;
 use crate::process;
 use crate::state::{AppState, lock};
 use crate::time::now_unix;
-use std::collections::HashSet;
+use crate::unity_sessions::{self, UnityGame};
+use std::collections::{HashMap, HashSet};
 use std::thread;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
@@ -34,19 +36,45 @@ fn playtime_marker(game: &Game) -> Option<ProcessMarker> {
     Some(game.process_marker.clone())
 }
 
-fn import_menu_sessions(app: &AppHandle) -> bool {
+fn import_external_sessions(app: &AppHandle, running: &HashSet<String>) -> bool {
     let state = app.state::<AppState>();
-    let desktop_ids: HashSet<String> = lock(&state.games)
-        .keys()
-        .filter(|id| id.starts_with("desktop:"))
-        .cloned()
+    let journal = journal_sessions::read();
+    let (desktop_ids, unity_games): (HashSet<String>, Vec<UnityGame>) = {
+        let games = lock(&state.games);
+        let desktop_ids = games
+            .keys()
+            .filter(|id| id.starts_with("desktop:"))
+            .cloned()
+            .collect();
+        let unity_games = games
+            .values()
+            .filter(|game| {
+                game.installed && game.playtime_tracked_by_konsol() && !running.contains(&game.id)
+            })
+            .map(|game| UnityGame {
+                id: game.id.clone(),
+                title: game.title.clone(),
+                wine_prefix: game.wine_prefix(),
+            })
+            .collect();
+        (desktop_ids, unity_games)
+    };
+    let mut sessions: Vec<PlaySession> = journal
+        .iter()
+        .filter_map(|session| {
+            let game_id = format!("desktop:{}", session.desktop_stem);
+            desktop_ids.contains(&game_id).then(|| PlaySession {
+                id: session.id.clone(),
+                game_id,
+                seconds: session.seconds,
+                ended_at: session.ended_at,
+            })
+        })
         .collect();
-    if desktop_ids.is_empty() {
-        return false;
-    }
-    let sessions = journal_sessions::read();
+    sessions.extend(unity_sessions::read(&state.home, &unity_games));
+    *lock(&state.journal) = journal;
     let mut playtime = lock(&state.playtime);
-    let imported = playtime.import(&sessions, &desktop_ids);
+    let imported = playtime.import(&sessions);
     if imported {
         playtime.save();
     }
@@ -60,12 +88,13 @@ pub fn start(app: AppHandle) {
         let mut last_tick = Instant::now();
         let mut last_save = Instant::now();
         let mut last_import: Option<Instant> = None;
+        let mut session_starts: HashMap<String, i64> = HashMap::new();
         loop {
             thread::sleep(TICK);
             let state = app.state::<AppState>();
             if last_import.is_none_or(|imported| imported.elapsed() >= IMPORT_JOURNAL_EVERY) {
                 last_import = Some(Instant::now());
-                if import_menu_sessions(&app) {
+                if import_external_sessions(&app, &previously_running) {
                     let _ = app.emit(LIBRARY_EVENT, ());
                 }
             }
@@ -99,8 +128,11 @@ pub fn start(app: AppHandle) {
             let session_ended = previously_running.difference(&running).next().is_some();
             {
                 let mut playtime = lock(&state.playtime);
+                let now = now_unix();
+                session_starts.retain(|id, _| tracked_running.contains(&id.as_str()));
                 for id in &tracked_running {
-                    playtime.add(id, elapsed, now_unix());
+                    let started_at = *session_starts.entry((*id).to_string()).or_insert(now);
+                    playtime.add_tracked(id, elapsed, started_at, now);
                 }
                 if session_ended
                     || (!tracked_running.is_empty() && last_save.elapsed() >= SAVE_EVERY)

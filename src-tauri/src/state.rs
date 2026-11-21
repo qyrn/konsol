@@ -1,5 +1,6 @@
 use crate::config::{ConfigStore, KonsolConfig};
 use crate::game::Game;
+use crate::journal_sessions::JournalSession;
 use crate::metadata::{MetadataStore, SteamLibraryCache};
 use crate::playtime::PlaytimeStore;
 use std::collections::HashMap;
@@ -16,6 +17,7 @@ pub struct AppState {
     pub playtime: Mutex<PlaytimeStore>,
     pub steam_library: SteamLibraryCache,
     pub running: Mutex<Vec<String>>,
+    pub journal: Mutex<Vec<JournalSession>>,
     pub enriching: AtomicBool,
     pub applications_dir: PathBuf,
     pub taskbar_icons_dir: PathBuf,
