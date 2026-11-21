@@ -90,7 +90,10 @@ const PREFIX_GAME_FOLDERS: [&str; 4] =
 struct GameFolder {
     directory: PathBuf,
     wine_prefix: Option<PathBuf>,
+    rockstar_launcher: Option<PathBuf>,
 }
+
+const ROCKSTAR_FOLDER: &str = "rockstar games";
 
 pub fn default_folders(home: &Path) -> Vec<PathBuf> {
     DEFAULT_FOLDERS
@@ -105,7 +108,9 @@ pub fn scan(folders: &[PathBuf], known_targets: &HashSet<PathBuf>) -> Vec<Game> 
         .iter()
         .flat_map(|folder| game_folders(folder, 0))
         .filter_map(|folder| {
-            let executable = main_executable(&folder.directory)?;
+            let Some(executable) = main_executable(&folder.directory) else {
+                return rockstar_game_to_install(&folder);
+            };
             let canonical = fs::canonicalize(&executable).unwrap_or_else(|_| executable.clone());
             if known_targets.contains(&canonical) {
                 return None;
@@ -136,6 +141,26 @@ fn visible_directories(path: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
+fn is_rockstar(directory: &Path) -> bool {
+    directory
+        .file_name()
+        .is_some_and(|name| name.to_string_lossy().to_lowercase() == ROCKSTAR_FOLDER)
+}
+
+fn rockstar_game_to_install(folder: &GameFolder) -> Option<Game> {
+    let launcher = folder.rockstar_launcher.as_deref()?;
+    let name = folder.directory.file_name()?.to_string_lossy().into_owned();
+    let mut game = Game::launched_by_konsol(
+        format!("folder:{}", folder.directory.display()),
+        pretty_title(&name),
+        GameSource::Rockstar,
+        LaunchTarget::Program(launcher.to_path_buf()),
+    );
+    game.installed = false;
+    game.install_command = Some(launch_command(launcher, folder.wine_prefix.as_deref()));
+    Some(game)
+}
+
 fn is_publisher(directory: &Path) -> bool {
     directory
         .file_name()
@@ -159,15 +184,22 @@ fn game_folders(folder: &Path, depth: usize) -> Vec<GameFolder> {
                     .iter()
                     .flat_map(|name| visible_directories(&drive.join(name)))
                     .flat_map(|candidate| {
+                        let launcher = is_rockstar(&candidate)
+                            .then(|| candidate.join("Launcher/Launcher.exe"))
+                            .filter(|launcher| launcher.is_file());
                         if is_publisher(&candidate) {
                             visible_directories(&candidate)
+                                .into_iter()
+                                .map(|child| (child, launcher.clone()))
+                                .collect()
                         } else {
-                            vec![candidate]
+                            vec![(candidate, None)]
                         }
                     })
-                    .map(|game_directory| GameFolder {
+                    .map(|(game_directory, rockstar_launcher)| GameFolder {
                         directory: game_directory,
                         wine_prefix: Some(directory.clone()),
+                        rockstar_launcher,
                     }),
             );
         } else if depth == 0
@@ -180,6 +212,7 @@ fn game_folders(folder: &Path, depth: usize) -> Vec<GameFolder> {
             found.push(GameFolder {
                 directory,
                 wine_prefix: None,
+                rockstar_launcher: None,
             });
         }
     }
@@ -329,10 +362,15 @@ fn game_from_folder(folder: &GameFolder, executable: &Path) -> Game {
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default();
     let location = executable.to_string_lossy().into_owned();
+    let source = if folder.rockstar_launcher.is_some() {
+        GameSource::Rockstar
+    } else {
+        GameSource::Desktop
+    };
     let mut game = Game::launched_by_konsol(
         format!("folder:{}", folder.directory.display()),
         pretty_title(&name),
-        GameSource::Desktop,
+        source,
         LaunchTarget::Command {
             arguments: launch_command(executable, folder.wine_prefix.as_deref()),
             working_directory: executable.parent().map(Path::to_path_buf),
@@ -383,10 +421,17 @@ mod tests {
             b"MZ-bigger-binary",
         );
         write_executable(&rockstar.join("Launcher/Launcher.exe"), b"MZ");
+        write_executable(&rockstar.join("Red Dead Redemption 2/mods.txt"), b"x");
 
         let found = scan(std::slice::from_ref(&games), &HashSet::new());
         let titles: Vec<&str> = found.iter().map(|game| game.title.as_str()).collect();
-        assert_eq!(found.len(), 3, "{titles:?}");
+        assert_eq!(found.len(), 4, "{titles:?}");
+        let red_dead = found
+            .iter()
+            .find(|game| game.title == "Red Dead Redemption 2")
+            .expect("Red Dead Redemption 2 to install");
+        assert!(!red_dead.installed);
+        assert_eq!(red_dead.source, GameSource::Rockstar);
         let gta = found
             .iter()
             .find(|game| game.title == "Grand Theft Auto V")
@@ -411,7 +456,7 @@ mod tests {
 
         let known: HashSet<PathBuf> =
             [fs::canonicalize(games.join("Skate3Recomp/Linux/skate3")).unwrap()].into();
-        assert_eq!(scan(&[games], &known).len(), 2);
+        assert_eq!(scan(&[games], &known).len(), 3);
         fs::remove_dir_all(root).unwrap();
     }
 

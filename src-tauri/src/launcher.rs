@@ -8,8 +8,30 @@ pub fn launch(game: &Game) -> Result<(), String> {
     let arguments = if game.installed {
         command_line(&game.launch)
     } else {
-        install_command_line(&game.launch)?
+        match &game.install_command {
+            Some(command) => command.clone(),
+            None => install_command_line(&game.launch)?,
+        }
     };
+    spawn(game, arguments)
+}
+
+pub fn uninstall(game: &Game) -> Result<(), String> {
+    let arguments = match &game.launch {
+        LaunchTarget::SteamApp(app_id) => {
+            vec!["steam".into(), format!("steam://uninstall/{app_id}")]
+        }
+        LaunchTarget::Heroic { .. } => vec!["heroic".into()],
+        LaunchTarget::Program(_) | LaunchTarget::Command { .. } => {
+            return Err(
+                "Konsol sait pas désinstaller ce jeu, supprime son dossier à la main.".to_string(),
+            );
+        }
+    };
+    spawn(game, arguments)
+}
+
+fn spawn(game: &Game, arguments: Vec<String>) -> Result<(), String> {
     let (program, rest) = arguments
         .split_first()
         .ok_or("Ce jeu n'a pas de commande de lancement.")?;
