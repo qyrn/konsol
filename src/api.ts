@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Achievement, Game, NewManualGame, Preferences, Settings } from "./types";
+import type { Achievement, Game, GameAchievements, NewManualGame, Preferences, Settings } from "./types";
 
 export const LIBRARY_EVENT = "library-changed";
 export const ACHIEVEMENT_EVENT = "achievement-unlocked";
@@ -30,6 +30,14 @@ export function addManualGame(game: NewManualGame): Promise<string> {
 
 export function saveGameFolders(folders: string[]): Promise<void> {
   return invoke("save_game_folders", { folders });
+}
+
+export function uninstallGame(id: string): Promise<void> {
+  return invoke("uninstall_game", { id });
+}
+
+export function achievementOverview(): Promise<GameAchievements[]> {
+  return invoke<GameAchievements[]>("achievement_overview");
 }
 
 export function stopGame(id: string): Promise<void> {

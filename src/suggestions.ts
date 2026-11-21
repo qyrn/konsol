@@ -56,7 +56,10 @@ export function suggestGames(games: Game[]): Suggestion[] {
   if (played.length === 0) return [];
 
   return games
-    .filter((game) => !game.hidden && playtime(game) < PLAYED_MINUTES && game.details.tags.length > 0)
+    .filter(
+      (game) =>
+        !game.hidden && playtime(game) === 0 && !game.details.lastPlayed && game.details.tags.length > 0,
+    )
     .flatMap((game) => {
       const vector = tagVector(game);
       const best = played

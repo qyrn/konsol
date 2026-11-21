@@ -3,7 +3,8 @@ use crate::achievements;
 use crate::artwork;
 use crate::commands::manual::validate_title;
 use crate::desktop_entry::DesktopPaths;
-use crate::game::Game;
+use crate::game::{Game, GameSource, LaunchTarget};
+use crate::journal_sessions::JournalSession;
 use crate::kde_history;
 use crate::launcher;
 use crate::metadata::{self, ApiKeys, EnrichContext, http};
@@ -54,6 +55,7 @@ pub fn list_games(app: AppHandle, state: State<'_, AppState>) -> Result<Vec<Game
         }
         (games, pending)
     };
+    ignore_aborted_steam_launches(&mut games, &lock(&state.journal));
     fill_accents(&mut games, &state.accents);
     *lock(&state.games) = games
         .iter()
@@ -136,6 +138,35 @@ fn refresh_steam_library(state: &AppState, agent: &ureq::Agent, keys: &ApiKeys) 
     state.steam_library.is_stale() && state.steam_library.refresh(agent, key, &steam_id)
 }
 
+const ABORTED_LAUNCH_SECONDS: u64 = 120;
+const SAME_SESSION_TOLERANCE: i64 = 300;
+
+fn ignore_aborted_steam_launches(games: &mut [Game], journal: &[JournalSession]) {
+    for game in games.iter_mut().filter(|game| game.installed) {
+        let (GameSource::Steam, LaunchTarget::SteamApp(app_id), Some(last_played)) =
+            (game.source, &game.launch, game.details.last_played)
+        else {
+            continue;
+        };
+        let stem = format!("steam-app{app_id}");
+        let sessions: Vec<&JournalSession> = journal
+            .iter()
+            .filter(|session| session.desktop_stem == stem)
+            .collect();
+        let aborted = sessions.iter().any(|session| {
+            (session.ended_at - last_played).abs() <= SAME_SESSION_TOLERANCE
+                && session.seconds < ABORTED_LAUNCH_SECONDS
+        });
+        if aborted {
+            game.details.last_played = sessions
+                .iter()
+                .filter(|session| session.seconds >= ABORTED_LAUNCH_SECONDS)
+                .map(|session| session.ended_at)
+                .max();
+        }
+    }
+}
+
 fn fill_accents(games: &mut [Game], cache: &Mutex<HashMap<PathBuf, Option<String>>>) {
     let mut cache = lock(cache);
     for game in games.iter_mut().filter(|game| game.accent.is_none()) {
@@ -210,6 +241,15 @@ pub fn rename_game(id: String, title: String, state: State<'_, AppState>) -> Res
 #[tauri::command]
 pub fn running_game_ids(state: State<'_, AppState>) -> Vec<String> {
     lock(&state.running).clone()
+}
+
+#[tauri::command]
+pub fn uninstall_game(id: String, state: State<'_, AppState>) -> Result<(), String> {
+    let game = lock(&state.games)
+        .get(&id)
+        .cloned()
+        .ok_or("Ce jeu n'est plus dans la liste, actualise la bibliothèque.")?;
+    launcher::uninstall(&game)
 }
 
 #[tauri::command]

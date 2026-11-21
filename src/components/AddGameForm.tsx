@@ -22,6 +22,7 @@ function previewGame(title: string, accent: string): Game {
     source: "manual",
     cover: null,
     hero: null,
+    capsule: null,
     accent,
     hidden: false,
     installed: true,

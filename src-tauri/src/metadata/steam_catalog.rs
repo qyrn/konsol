@@ -50,6 +50,7 @@ pub struct CatalogEntry {
     pub app_type: Option<u32>,
     pub cover: Option<String>,
     pub hero: Option<String>,
+    pub capsule: Option<String>,
     pub developer: Option<String>,
     pub year: Option<u16>,
     pub tags: Vec<(u32, u32)>,
@@ -144,8 +145,9 @@ fn entry_from(item: &Value) -> CatalogEntry {
             .get("type")
             .and_then(Value::as_u64)
             .and_then(|kind| u32::try_from(kind).ok()),
-        cover: asset(&["library_capsule_2x", "library_capsule"]),
+        cover: asset(&["library_capsule", "library_capsule_2x"]),
         hero: asset(&["library_hero", "page_background"]),
+        capsule: asset(&["main_capsule", "header"]),
         developer: item
             .get("basic_info")
             .and_then(|info| info.get("developers"))

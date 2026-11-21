@@ -67,6 +67,7 @@ pub fn owned_not_installed(owned: &[OwnedApp], installed_ids: &HashSet<String>) 
                 source: GameSource::Steam,
                 cover: Some(asset("library_600x900.jpg")),
                 hero: Some(asset("library_hero.jpg")),
+                capsule: None,
                 accent: None,
                 hidden: false,
                 installed: false,
@@ -81,6 +82,7 @@ pub fn owned_not_installed(owned: &[OwnedApp], installed_ids: &HashSet<String>) 
                     name: "SteamAppId",
                     value: app_id,
                 },
+                install_command: None,
                 icon_source: None,
                 achievement_source: None,
             }
@@ -214,6 +216,7 @@ fn game_from_manifest(
         title: name.to_string(),
         source: GameSource::Steam,
         hero: find_art(&cache, app_id, "library_hero.jpg"),
+        capsule: None,
         cover,
         accent: None,
         hidden: false,
@@ -225,6 +228,7 @@ fn game_from_manifest(
             name: "SteamAppId",
             value: app_id.to_string(),
         },
+        install_command: None,
         icon_source,
         achievement_source: Some(AchievementSource::Steam {
             app_id: app_id.to_string(),

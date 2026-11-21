@@ -1,4 +1,4 @@
-export type GameSource = "steam" | "gog" | "epic" | "amazon" | "desktop" | "manual";
+export type GameSource = "steam" | "gog" | "epic" | "amazon" | "rockstar" | "desktop" | "manual";
 
 export type ImageSource = { kind: "file"; value: string } | { kind: "url"; value: string };
 
@@ -8,6 +8,7 @@ export interface Game {
   source: GameSource;
   cover: ImageSource | null;
   hero: ImageSource | null;
+  capsule: ImageSource | null;
   accent: string | null;
   hidden: boolean;
   installed: boolean;
@@ -52,6 +53,13 @@ export interface Preferences {
   keepRunningInBackground: boolean;
   accentFollowsGame: boolean;
   reduceMotion: boolean;
+}
+
+export interface GameAchievements {
+  gameId: string;
+  unlocked: number;
+  total: number | null;
+  recent: Achievement[];
 }
 
 export interface Settings {

@@ -18,6 +18,7 @@ interface TopBarProps {
 const TABS: { view: View; label: string }[] = [
   { view: "home", label: "Accueil" },
   { view: "library", label: "Bibliothèque" },
+  { view: "achievements", label: "Succès" },
   { view: "settings", label: "Réglages" },
 ];
 

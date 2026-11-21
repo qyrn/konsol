@@ -20,6 +20,7 @@ mod state;
 mod steam_cdn;
 mod time;
 mod tray;
+mod unity_sessions;
 mod vdf;
 mod window_watch;
 
@@ -51,6 +52,7 @@ pub fn run() {
                 playtime: Mutex::new(PlaytimeStore::load(&paths.app_data_dir()?)),
                 steam_library: SteamLibraryCache::new(&cache_dir),
                 running: Mutex::new(Vec::new()),
+                journal: Mutex::new(Vec::new()),
                 enriching: AtomicBool::new(false),
                 applications_dir: paths.data_dir()?.join("applications"),
                 taskbar_icons_dir: paths.app_data_dir()?.join("icons"),
@@ -68,6 +70,8 @@ pub fn run() {
             commands::library::rename_game,
             commands::library::running_game_ids,
             commands::library::stop_game,
+            commands::library::uninstall_game,
+            commands::achievements::achievement_overview,
             commands::manual::add_manual_game,
             commands::manual::remove_manual_game,
             commands::achievements::get_achievements,

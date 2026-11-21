@@ -33,6 +33,7 @@ const SOURCE_LOCATIONS: Record<GameSource, string> = {
   gog: "~/.config/heroic",
   epic: "~/.config/heroic",
   amazon: "~/.config/heroic",
+  rockstar: "Préfixes Wine de tes dossiers de jeux",
   desktop: "~/.local/share/applications",
   manual: "~/.config/dev.qyrn.konsol/config.json",
 };

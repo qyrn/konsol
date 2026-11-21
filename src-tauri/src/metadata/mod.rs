@@ -32,18 +32,36 @@ pub struct GameMetadata {
     pub tags: Vec<TagWeight>,
     pub cover_url: Option<String>,
     pub hero_url: Option<String>,
+    pub capsule_url: Option<String>,
+    pub grid_cover_url: Option<String>,
+    pub grid_cover_done: bool,
     pub app_type: Option<u32>,
     pub size_bytes: Option<u64>,
     pub achievement_rarity: Option<HashMap<String, u16>>,
     pub store_lookup_done: bool,
     pub grid_lookup_done: bool,
     pub schema_lookup_done: bool,
-    pub catalog_done: bool,
+    pub catalog_v2_done: bool,
     pub size_lookup_done: bool,
     pub rarity_lookup_done: bool,
 }
 
+const GENERATED_PORTRAIT: &str = "/portrait.png";
+
 impl GameMetadata {
+    fn has_real_store_cover(&self) -> bool {
+        self.cover_url
+            .as_deref()
+            .is_some_and(|url| !url.contains(GENERATED_PORTRAIT))
+    }
+
+    fn best_remote_cover(&self) -> Option<&String> {
+        if self.has_real_store_cover() {
+            return self.cover_url.as_ref();
+        }
+        self.grid_cover_url.as_ref().or(self.cover_url.as_ref())
+    }
+
     fn store_app_id(&self, game: &Game) -> Option<u32> {
         if game.source == GameSource::Steam {
             return game.id.trim_start_matches("steam:").parse().ok();
@@ -165,7 +183,7 @@ pub fn apply(games: Vec<Game>, store: &MetadataStore) -> Vec<Game> {
             let is_remote_or_missing =
                 |image: &Option<ImageSource>| !matches!(image, Some(ImageSource::File(_)));
             if is_remote_or_missing(&game.cover)
-                && let Some(url) = &metadata.cover_url
+                && let Some(url) = metadata.best_remote_cover()
             {
                 game.cover = Some(ImageSource::Url(url.clone()));
             }
@@ -173,6 +191,9 @@ pub fn apply(games: Vec<Game>, store: &MetadataStore) -> Vec<Game> {
                 && let Some(url) = &metadata.hero_url
             {
                 game.hero = Some(ImageSource::Url(url.clone()));
+            }
+            if let Some(url) = &metadata.capsule_url {
+                game.capsule = Some(ImageSource::Url(url.clone()));
             }
             let details = &mut game.details;
             details.developer = details.developer.take().or(metadata.developer.clone());
@@ -197,6 +218,7 @@ struct PendingSteps {
     grid_lookup: bool,
     schema_lookup: bool,
     catalog_lookup: bool,
+    grid_cover_lookup: bool,
     size_lookup: bool,
     rarity_lookup: bool,
 }
@@ -207,6 +229,7 @@ impl PendingSteps {
             || self.grid_lookup
             || self.schema_lookup
             || self.catalog_lookup
+            || self.grid_cover_lookup
             || self.size_lookup
             || self.rarity_lookup
     }
@@ -236,7 +259,13 @@ fn pending_steps(game: &Game, metadata: &GameMetadata, keys: &ApiKeys) -> Pendin
             && keys.steam_web.is_some()
             && !metadata.schema_lookup_done
             && (metadata.steam_app_id.is_some() || app_id_pending),
-        catalog_lookup: !metadata.catalog_done && (app_id_known || app_id_pending),
+        catalog_lookup: !metadata.catalog_v2_done && (app_id_known || app_id_pending),
+        grid_cover_lookup: keys.steam_grid_db.is_some()
+            && metadata.catalog_v2_done
+            && !metadata.has_real_store_cover()
+            && !metadata.grid_cover_done
+            && app_id_known
+            && !matches!(game.cover, Some(ImageSource::File(_))),
         size_lookup: game.installed
             && game.details.size_bytes.is_none()
             && game.details.location.is_some()
@@ -305,6 +334,12 @@ pub fn enrich_game(
         metadata.schema_lookup_done = true;
     }
     let app_id = metadata.store_app_id(game);
+    if let (Some(key), Some(app_id)) = (keys.steam_grid_db.as_deref(), app_id)
+        && pending_steps(game, &metadata, keys).grid_cover_lookup
+    {
+        metadata.grid_cover_url = steamgriddb::grid_for_steam_app(agent, key, app_id);
+        metadata.grid_cover_done = true;
+    }
     if pending_steps(game, &metadata, keys).rarity_lookup {
         metadata.achievement_rarity =
             app_id.and_then(|app_id| steam_web::achievement_rarity(agent, app_id));
@@ -325,7 +360,7 @@ pub fn catalog_requests(games: &[Game], store: &MetadataStore) -> Vec<(String, u
         .iter()
         .filter_map(|game| {
             let metadata = store.get(&game.id).cloned().unwrap_or_default();
-            if metadata.catalog_done {
+            if metadata.catalog_v2_done {
                 return None;
             }
             metadata
@@ -357,6 +392,7 @@ pub fn fetch_catalog(
                         metadata.app_type = entry.app_type;
                         metadata.cover_url = entry.cover.clone();
                         metadata.hero_url = entry.hero.clone();
+                        metadata.capsule_url = entry.capsule.clone();
                         metadata.developer = entry.developer.clone().or(metadata.developer);
                         metadata.year = entry.year.or(metadata.year);
                         metadata.category = tags.category(&entry.tags);
@@ -370,7 +406,7 @@ pub fn fetch_catalog(
                                 })
                             })
                             .collect();
-                        metadata.catalog_done = true;
+                        metadata.catalog_v2_done = true;
                         Some((game_id.clone(), metadata))
                     })
                     .collect(),

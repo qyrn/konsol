@@ -10,6 +10,7 @@ pub enum GameSource {
     Amazon,
     Desktop,
     Manual,
+    Rockstar,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -89,6 +90,7 @@ pub struct Game {
     pub source: GameSource,
     pub cover: Option<ImageSource>,
     pub hero: Option<ImageSource>,
+    pub capsule: Option<ImageSource>,
     pub accent: Option<String>,
     pub hidden: bool,
     pub installed: bool,
@@ -96,6 +98,8 @@ pub struct Game {
     pub details: GameDetails,
     #[serde(skip)]
     pub launch: LaunchTarget,
+    #[serde(skip)]
+    pub install_command: Option<Vec<String>>,
     #[serde(skip)]
     pub process_marker: ProcessMarker,
     #[serde(skip)]
@@ -123,12 +127,14 @@ impl Game {
             source,
             cover: None,
             hero: None,
+            capsule: None,
             accent: None,
             hidden: false,
             installed: true,
             achievements: None,
             details: GameDetails::default(),
             launch,
+            install_command: None,
             icon_source: None,
             achievement_source: None,
         }
@@ -139,11 +145,27 @@ impl Game {
         self
     }
 
+    pub fn wine_prefix(&self) -> Option<PathBuf> {
+        let LaunchTarget::Command { arguments, .. } = &self.launch else {
+            return None;
+        };
+        arguments
+            .iter()
+            .find_map(|argument| argument.strip_prefix("WINEPREFIX="))
+            .map(PathBuf::from)
+    }
+
     pub fn playtime_tracked_by_konsol(&self) -> bool {
-        matches!(self.source, GameSource::Desktop | GameSource::Manual)
+        matches!(
+            self.source,
+            GameSource::Desktop | GameSource::Manual | GameSource::Rockstar
+        )
     }
 
     pub fn needs_store_artwork(&self) -> bool {
-        matches!(self.source, GameSource::Desktop | GameSource::Manual)
+        matches!(
+            self.source,
+            GameSource::Desktop | GameSource::Manual | GameSource::Rockstar
+        )
     }
 }

@@ -15,8 +15,11 @@ interface GameDetailProps {
   onRename: () => void;
   onToggleHidden: (game: Game) => void;
   onRemove: (game: Game) => void;
+  onUninstall: (game: Game) => void;
   onOpenAchievements: () => void;
 }
+
+const UNINSTALLABLE: Game["source"][] = ["steam", "gog", "epic", "amazon"];
 
 interface Stat {
   label: string;
@@ -37,7 +40,9 @@ function detailStats(game: Game): Stat[] {
       : null,
     {
       label: "Dernière session",
-      value: lastPlayedLabel(details.lastPlayed, Date.now()) ?? "Jamais lancé",
+      value:
+        lastPlayedLabel(details.lastPlayed, Date.now()) ??
+        (details.playtimeMinutes ? "Inconnue" : "Jamais lancé"),
       small: true,
     },
   ];
@@ -52,6 +57,7 @@ export function GameDetail({
   onRename,
   onToggleHidden,
   onRemove,
+  onUninstall,
   onOpenAchievements,
 }: GameDetailProps) {
   const { details } = game;
@@ -73,6 +79,11 @@ export function GameDetail({
           <button type="button" className="glass-button" onClick={onRename}>
             Renommer
           </button>
+          {game.installed && UNINSTALLABLE.includes(game.source) && (
+            <button type="button" className="glass-button" onClick={() => onUninstall(game)}>
+              Désinstaller
+            </button>
+          )}
           {game.source === "manual" ? (
             <button type="button" className="glass-button" onClick={() => onRemove(game)}>
               Retirer

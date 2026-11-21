@@ -7,9 +7,11 @@ import {
   removeManualGame,
   setGameHidden,
   stopGame,
+  uninstallGame,
 } from "./api";
 import { AchievementsPanel } from "./components/AchievementsPanel";
 import { AddGameForm } from "./components/AddGameForm";
+import { AchievementsPage } from "./components/AchievementsPage";
 import { Backdrop } from "./components/Backdrop";
 import { CenteredStage } from "./components/CenteredStage";
 import { CommandPalette } from "./components/CommandPalette";
@@ -90,7 +92,12 @@ export function App() {
   const focusedGame = libraryGames.find((game) => game.id === selectedId) ?? selectedGame;
   const selectedIndex = selectedGame ? visibleGames.indexOf(selectedGame) : 0;
   const stageGame = view === "home" ? selectedGame : focusedGame;
-  const backdropGames = stageGame && !stageGame.installed ? [...visibleGames, stageGame] : visibleGames;
+  const opaqueView = view === "library" || view === "achievements" || view === "settings";
+  const backdropGames = opaqueView
+    ? []
+    : stageGame && !stageGame.installed
+      ? [...visibleGames, stageGame]
+      : visibleGames;
 
   function launchStatus(game: Game): LaunchStatus {
     if (runningIds.has(game.id)) return "running";
@@ -196,6 +203,19 @@ export function App() {
     );
   }
 
+  async function handleUninstall(game: Game) {
+    try {
+      await uninstallGame(game.id);
+      setNotice(
+        game.source === "steam"
+          ? `Steam te demande de confirmer la désinstallation de ${game.title}.`
+          : `Heroic s'ouvre, désinstalle ${game.title} depuis sa page.`,
+      );
+    } catch (error) {
+      setNotice(errorMessage(error));
+    }
+  }
+
   function handleRemove(game: Game) {
     setSelectedId(null);
     navigate("library");
@@ -280,6 +300,7 @@ export function App() {
   return (
     <div
       className="app"
+      data-view={view}
       data-flat-accent={!preferences.accentFollowsGame}
       data-reduce-motion={preferences.reduceMotion}
       style={cssVariable(
@@ -310,6 +331,16 @@ export function App() {
             onLaunch={launchFromLibrary}
           />
         )}
+        {view === "achievements" && (
+          <AchievementsPage
+            games={library.games}
+            refreshKey={achievementsRefreshKey}
+            onOpenGame={(game) => {
+              setSelectedId(game.id);
+              setOverlay("achievements");
+            }}
+          />
+        )}
         {view === "detail" && focusedGame && (
           <GameDetail
             game={focusedGame}
@@ -319,6 +350,7 @@ export function App() {
             onRename={() => setOverlay("rename")}
             onToggleHidden={handleToggleHidden}
             onRemove={handleRemove}
+            onUninstall={(game) => void handleUninstall(game)}
             onOpenAchievements={() => setOverlay("achievements")}
           />
         )}

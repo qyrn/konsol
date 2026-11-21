@@ -40,6 +40,19 @@ pub fn grid(agent: &Agent, key: &str, game_id: u64) -> Option<String> {
     )
 }
 
+pub fn grid_for_steam_app(agent: &Agent, key: &str, app_id: u32) -> Option<String> {
+    first_url(
+        agent,
+        key,
+        &format!("/grids/steam/{app_id}"),
+        &[
+            ("dimensions", "600x900"),
+            ("types", "static"),
+            ("mimes", "image/jpeg,image/png"),
+        ],
+    )
+}
+
 pub fn hero(agent: &Agent, key: &str, game_id: u64) -> Option<String> {
     first_url(
         agent,

@@ -49,3 +49,50 @@ fn from_steam_account(
     metadata::player_achievements(&http::agent(), &key, &steam_id, app_id.parse().ok()?)
         .filter(|list| !list.is_empty())
 }
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameAchievements {
+    game_id: String,
+    unlocked: usize,
+    total: Option<usize>,
+    recent: Vec<Achievement>,
+}
+
+const RECENT_PER_GAME: usize = 5;
+
+#[tauri::command]
+pub async fn achievement_overview(app: AppHandle) -> Result<Vec<GameAchievements>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let sources: Vec<_> = lock(&state.games)
+            .values()
+            .filter_map(|game| Some((game.id.clone(), game.achievement_source.clone()?)))
+            .collect();
+        sources
+            .into_iter()
+            .filter_map(|(game_id, source)| {
+                let list = {
+                    let store = lock(&state.metadata);
+                    achievements::read(&source, &state.home, store.emulator_schema(&game_id))?
+                };
+                let summary = list.summary();
+                let mut unlocked: Vec<Achievement> = list
+                    .achievements
+                    .into_iter()
+                    .filter(|achievement| achievement.unlocked_at.is_some())
+                    .collect();
+                unlocked.sort_by_key(|achievement| std::cmp::Reverse(achievement.unlocked_at));
+                unlocked.truncate(RECENT_PER_GAME);
+                Some(GameAchievements {
+                    game_id,
+                    unlocked: summary.unlocked,
+                    total: summary.total,
+                    recent: unlocked,
+                })
+            })
+            .collect()
+    })
+    .await
+    .map_err(|error| format!("Impossible de lire les succès : {error}"))
+}
