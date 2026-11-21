@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { errorMessage, getAchievements } from "../api";
+import { rarityLabel } from "../format";
 import { cssVariable } from "../images";
 import type { Achievement, Game } from "../types";
 import { CloseButton } from "./CloseButton";
@@ -117,16 +118,21 @@ export function AchievementsPanel({ game, refreshKey, onClose }: AchievementsPan
                 <span className="achievement-description">{achievement.description}</span>
               )}
             </span>
-            {achievement.unlockedAt !== null ? (
-              <time
-                className="achievement-date"
-                dateTime={new Date(achievement.unlockedAt * 1000).toISOString()}
-              >
-                {dateFormatter.format(new Date(achievement.unlockedAt * 1000))}
-              </time>
-            ) : (
-              <span className="achievement-date">{achievement.unlocked ? "Débloqué" : "Verrouillé"}</span>
-            )}
+            <span className="achievement-meta">
+              {achievement.unlockedAt !== null ? (
+                <time
+                  className="achievement-date"
+                  dateTime={new Date(achievement.unlockedAt * 1000).toISOString()}
+                >
+                  {dateFormatter.format(new Date(achievement.unlockedAt * 1000))}
+                </time>
+              ) : (
+                <span className="achievement-date">{achievement.unlocked ? "Débloqué" : "Verrouillé"}</span>
+              )}
+              {rarityLabel(achievement.rarityTenths) && (
+                <span className="achievement-rarity">{rarityLabel(achievement.rarityTenths)}</span>
+              )}
+            </span>
           </li>
         ))}
       </ul>

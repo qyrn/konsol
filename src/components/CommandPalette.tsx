@@ -1,4 +1,5 @@
 import { type KeyboardEvent, useState } from "react";
+import { lastPlayedLabel, playtimeLabel } from "../format";
 import { DEFAULT_ACCENT, cssVariable } from "../images";
 import { SOURCE_LABELS } from "../sources";
 import type { Game } from "../types";
@@ -101,7 +102,7 @@ export function CommandPalette({
         <kbd>Échap</kbd>
       </div>
       <div className="palette-sections">
-        <p className="palette-heading">Jeux</p>
+        <p className="palette-heading">{normalizedQuery ? "Jeux" : "Récents"}</p>
         {results.length === 0 && <p className="palette-empty">Aucun jeu ne correspond.</p>}
         <ul className="palette-list">
           {results.map((game) => (
@@ -118,7 +119,15 @@ export function CommandPalette({
                 </span>
                 <span className="palette-game-text">
                   <span className="palette-game-title">{game.title}</span>
-                  <span className="palette-game-meta">{SOURCE_LABELS[game.source]}</span>
+                  <span className="palette-game-meta">
+                    {[
+                      SOURCE_LABELS[game.source],
+                      playtimeLabel(game.details.playtimeMinutes),
+                      lastPlayedLabel(game.details.lastPlayed, Date.now()),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
                 </span>
               </button>
               <button type="button" className="palette-launch" onClick={() => onLaunch(game)}>

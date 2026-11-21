@@ -1,4 +1,7 @@
-use crate::game::{AchievementSource, Game, GameSource, ImageSource, LaunchTarget, ProcessMarker};
+use crate::game::{
+    AchievementSource, Game, GameDetails, GameSource, ImageSource, LaunchTarget, ProcessMarker,
+};
+use crate::time::iso_timestamp;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -9,12 +12,21 @@ struct StoreEntry {
     title: String,
     cover_url: Option<String>,
     hero_url: Option<String>,
+    developer: Option<String>,
+    genre: Option<String>,
 }
 
 struct InstalledGame {
     app_name: String,
     install_path: Option<String>,
     fallback_title: Option<String>,
+    size_bytes: Option<u64>,
+}
+
+#[derive(Clone, Copy, Default)]
+struct Playtime {
+    minutes: u64,
+    last_played: Option<i64>,
 }
 
 struct Store {
@@ -47,13 +59,40 @@ const STORES: [Store; 3] = [
 
 pub fn scan(home: &Path) -> Vec<Game> {
     let heroic_dir = home.join(".config/heroic");
+    let playtimes = read_playtimes(&heroic_dir);
     STORES
         .iter()
-        .flat_map(|store| scan_store(&heroic_dir, store))
+        .flat_map(|store| scan_store(&heroic_dir, store, &playtimes))
         .collect()
 }
 
-fn scan_store(heroic_dir: &Path, store: &Store) -> Vec<Game> {
+fn read_playtimes(heroic_dir: &Path) -> HashMap<String, Playtime> {
+    read_json(&heroic_dir.join("store/timestamp.json"))
+        .as_ref()
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+        .map(|(app_name, entry)| {
+            let playtime = Playtime {
+                minutes: entry
+                    .get("totalPlayed")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0),
+                last_played: entry
+                    .get("lastPlayed")
+                    .and_then(Value::as_str)
+                    .and_then(iso_timestamp),
+            };
+            (app_name.clone(), playtime)
+        })
+        .collect()
+}
+
+fn scan_store(
+    heroic_dir: &Path,
+    store: &Store,
+    playtimes: &HashMap<String, Playtime>,
+) -> Vec<Game> {
     let library = read_library(&heroic_dir.join(store.library_file));
     (store.installed)(heroic_dir)
         .into_iter()
@@ -69,6 +108,19 @@ fn scan_store(heroic_dir: &Path, store: &Store) -> Vec<Game> {
             let hero = entry
                 .and_then(|entry| entry.hero_url.as_deref())
                 .map(|url| cached_image(heroic_dir, url));
+            let playtime = playtimes
+                .get(&installed.app_name)
+                .copied()
+                .unwrap_or_default();
+            let details = GameDetails {
+                playtime_minutes: Some(playtime.minutes),
+                last_played: playtime.last_played,
+                size_bytes: installed.size_bytes,
+                developer: entry.and_then(|entry| entry.developer.clone()),
+                genre: entry.and_then(|entry| entry.genre.clone()),
+                location: installed.install_path.clone(),
+                ..GameDetails::default()
+            };
             let process_marker = wine_prefix(heroic_dir, &installed.app_name)
                 .or(installed.install_path)
                 .map(ProcessMarker::Mentions)?;
@@ -82,6 +134,7 @@ fn scan_store(heroic_dir: &Path, store: &Store) -> Vec<Game> {
                 accent: None,
                 hidden: false,
                 achievements: None,
+                details,
                 achievement_source: (store.source == GameSource::Gog).then(|| {
                     AchievementSource::Gog {
                         app_name: installed.app_name.clone(),
@@ -160,6 +213,13 @@ fn read_library(path: &Path) -> HashMap<String, StoreEntry> {
                 title: text_field(game, "title")?,
                 cover_url: https_field(game, &["art_square", "art_cover"]),
                 hero_url: https_field(game, &["art_background", "art_cover"]),
+                developer: text_field(game, "developer"),
+                genre: game
+                    .get("extra")
+                    .and_then(|extra| extra.get("genres"))
+                    .and_then(|genres| genres.get(0))
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
             };
             Some((app_name, entry))
         })
@@ -189,6 +249,7 @@ fn installed_gog(heroic_dir: &Path) -> Vec<InstalledGame> {
                 app_name: text_field(game, "appName")?,
                 fallback_title: folder_name(install_path.as_deref()),
                 install_path,
+                size_bytes: game.get("install_size").and_then(size_in_bytes),
             })
         })
         .collect()
@@ -208,6 +269,7 @@ fn installed_epic(heroic_dir: &Path) -> Vec<InstalledGame> {
             app_name: app_name.clone(),
             install_path: text_field(game, "install_path"),
             fallback_title: text_field(game, "title"),
+            size_bytes: game.get("install_size").and_then(size_in_bytes),
         })
         .collect()
 }
@@ -226,14 +288,43 @@ fn installed_amazon(heroic_dir: &Path) -> Vec<InstalledGame> {
                 app_name: text_field(game, "id")?,
                 fallback_title: folder_name(install_path.as_deref()),
                 install_path,
+                size_bytes: None,
             })
         })
         .collect()
 }
 
+fn size_in_bytes(value: &Value) -> Option<u64> {
+    if let Some(bytes) = value.as_u64() {
+        return Some(bytes);
+    }
+    let (amount, unit) = value.as_str()?.trim().split_once(' ')?;
+    let amount: f64 = amount.parse().ok()?;
+    let multiplier = match unit {
+        "B" => 1.0,
+        "KiB" | "KB" => 1024.0,
+        "MiB" | "MB" => 1024.0 * 1024.0,
+        "GiB" | "GB" => 1024.0 * 1024.0 * 1024.0,
+        "TiB" | "TB" => 1024.0 * 1024.0 * 1024.0 * 1024.0,
+        _ => return None,
+    };
+    let bytes = amount * multiplier;
+    (bytes.is_finite() && bytes >= 0.0).then_some(bytes as u64)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_install_sizes_in_both_heroic_formats() {
+        assert_eq!(
+            size_in_bytes(&serde_json::json!("82.22 GiB")),
+            Some(88_283_052_769)
+        );
+        assert_eq!(size_in_bytes(&serde_json::json!(1234)), Some(1234));
+        assert_eq!(size_in_bytes(&serde_json::json!("lots")), None);
+    }
 
     #[test]
     fn rejects_app_names_that_could_alter_the_launch_url() {

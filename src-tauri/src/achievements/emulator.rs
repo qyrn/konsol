@@ -53,6 +53,7 @@ fn achievement(
         icon_url,
         unlocked,
         unlocked_at: state.and_then(|state| state.time).filter(|_| unlocked),
+        rarity_tenths: None,
     }
 }
 

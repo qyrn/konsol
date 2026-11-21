@@ -39,6 +39,7 @@ fn game_from_entry(stem: &str, entry: DesktopFile) -> Option<Game> {
     let working_directory = entry
         .working_directory
         .or_else(|| target.parent().map(Path::to_path_buf));
+    let location = target.to_string_lossy().into_owned();
     let mut game = Game::launched_by_konsol(
         format!("desktop:{stem}"),
         entry.name,
@@ -48,6 +49,7 @@ fn game_from_entry(stem: &str, entry: DesktopFile) -> Option<Game> {
             working_directory,
         },
     );
+    game.details.location = Some(location);
     game.achievement_source = target
         .parent()
         .map(|directory| directory.join(EMULATOR_STATS_FILE))

@@ -6,6 +6,7 @@ import {
   launchGame,
   removeManualGame,
   setGameHidden,
+  stopGame,
 } from "./api";
 import { AchievementsPanel } from "./components/AchievementsPanel";
 import { AddGameForm } from "./components/AddGameForm";
@@ -20,10 +21,12 @@ import { NowPlaying } from "./components/NowPlaying";
 import { RenameForm } from "./components/RenameForm";
 import { SettingsPage } from "./components/SettingsPage";
 import { type SessionIndicator, TopBar } from "./components/TopBar";
+import { byMostRecent } from "./format";
 import { DEFAULT_ACCENT, cssVariable } from "./images";
 import type { LaunchStatus } from "./launchStatus";
 import type { Game } from "./types";
 import { useLibrary } from "./useLibrary";
+import { usePreferences } from "./usePreferences";
 import { useRunningGames } from "./useRunningGames";
 import { useSessionStarts } from "./useSessionStarts";
 import { useTauriEvent } from "./useTauriEvent";
@@ -47,6 +50,8 @@ export function App() {
   const [launchingId, setLaunchingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [achievementsRefreshKey, setAchievementsRefreshKey] = useState(0);
+  const [stoppingId, setStoppingId] = useState<string | null>(null);
+  const { preferences, update: updatePreferences } = usePreferences(setNotice);
 
   useTauriEvent(LIBRARY_EVENT, () => void library.reload());
   useTauriEvent(ACHIEVEMENT_EVENT, () => {
@@ -71,7 +76,7 @@ export function App() {
   }, [notice]);
 
   const visibleGames = useMemo(
-    () => library.games.filter((game) => showHidden || !game.hidden),
+    () => library.games.filter((game) => showHidden || !game.hidden).sort(byMostRecent),
     [library.games, showHidden],
   );
   const hiddenCount = library.games.filter((game) => game.hidden).length;
@@ -93,6 +98,20 @@ export function App() {
     } catch (error) {
       setNotice(errorMessage(error));
       setLaunchingId(null);
+    }
+  }
+
+  useEffect(() => {
+    if (stoppingId && !runningIds.has(stoppingId)) setStoppingId(null);
+  }, [stoppingId, runningIds]);
+
+  async function handleStop(game: Game) {
+    setStoppingId(game.id);
+    try {
+      await stopGame(game.id);
+    } catch (error) {
+      setNotice(errorMessage(error));
+      setStoppingId(null);
     }
   }
 
@@ -206,7 +225,13 @@ export function App() {
     return (
       <div className="home">
         {selectedStart !== undefined ? (
-          <NowPlaying game={selectedGame} startedAt={selectedStart} />
+          <NowPlaying
+            game={selectedGame}
+            startedAt={selectedStart}
+            returnsWhenDone={preferences.minimizeDuringSession}
+            stopping={stoppingId === selectedGame.id}
+            onStop={() => void handleStop(selectedGame)}
+          />
         ) : (
           <>
             <CoverCarousel
@@ -239,7 +264,15 @@ export function App() {
   }
 
   return (
-    <div className="app" style={cssVariable("--accent", selectedGame?.accent ?? DEFAULT_ACCENT)}>
+    <div
+      className="app"
+      data-flat-accent={!preferences.accentFollowsGame}
+      data-reduce-motion={preferences.reduceMotion}
+      style={cssVariable(
+        "--accent",
+        preferences.accentFollowsGame ? (selectedGame?.accent ?? DEFAULT_ACCENT) : DEFAULT_ACCENT,
+      )}
+    >
       <Backdrop games={visibleGames} selectedId={selectedGame?.id ?? null} veil={VIEW_VEIL[view]} />
 
       <TopBar
@@ -279,6 +312,8 @@ export function App() {
           <SettingsPage
             games={library.games}
             scanning={library.loading}
+            preferences={preferences}
+            onPreferencesChange={(next) => void updatePreferences(next)}
             onRescan={rescan}
             onKeysSaved={() => {
               setNotice("Clés enregistrées, Konsol va chercher ce qui manque.");

@@ -3,7 +3,7 @@ use crate::achievements;
 use crate::artwork;
 use crate::commands::manual::validate_title;
 use crate::desktop_entry::DesktopPaths;
-use crate::game::{Game, ProcessMarker};
+use crate::game::Game;
 use crate::launcher;
 use crate::metadata::{self, ApiKeys};
 use crate::process;
@@ -29,7 +29,13 @@ pub fn list_games(app: AppHandle, state: State<'_, AppState>) -> Result<Vec<Game
         let games = metadata::apply(scanned.clone(), &store);
         let pending = metadata::needs_enrichment(&scanned, &store, &keys);
         let mut games = games;
+        let playtime = lock(&state.playtime);
         for game in &mut games {
+            if game.playtime_tracked_by_konsol() {
+                let tracked = playtime.get(&game.id).unwrap_or_default();
+                game.details.playtime_minutes = Some(tracked.seconds / 60);
+                game.details.last_played = (tracked.last_played > 0).then_some(tracked.last_played);
+            }
             game.achievements = game.achievement_source.as_ref().and_then(|source| {
                 achievements::read(source, &state.home, store.emulator_schema(&game.id))
                     .map(|list| list.summary())
@@ -59,7 +65,8 @@ fn start_enrichment(app: &AppHandle, games: Vec<Game>, keys: ApiKeys) {
     };
     let app = app.clone();
     thread::spawn(move || {
-        let updates = metadata::enrich(&games, snapshot, &keys, &images_dir);
+        let home = app.state::<AppState>().home.clone();
+        let updates = metadata::enrich(&games, snapshot, &keys, &images_dir, &home);
         let state = app.state::<AppState>();
         let changed = lock(&state.metadata).merge(updates);
         state.enriching.store(false, Ordering::SeqCst);
@@ -71,7 +78,7 @@ fn start_enrichment(app: &AppHandle, games: Vec<Game>, keys: ApiKeys) {
 
 fn fill_accents(games: &mut [Game], cache: &Mutex<HashMap<PathBuf, Option<String>>>) {
     let mut cache = lock(cache);
-    for game in games {
+    for game in games.iter_mut().filter(|game| game.accent.is_none()) {
         let from_cover = game
             .cover
             .as_ref()
@@ -139,12 +146,14 @@ pub fn rename_game(id: String, title: String, state: State<'_, AppState>) -> Res
 
 #[tauri::command]
 pub fn running_game_ids(state: State<'_, AppState>) -> Vec<String> {
-    let markers: Vec<(String, ProcessMarker)> = lock(&state.games)
-        .values()
-        .map(|game| (game.id.clone(), game.process_marker.clone()))
-        .collect();
-    process::running_keys(&markers)
-        .into_iter()
-        .cloned()
-        .collect()
+    lock(&state.running).clone()
+}
+
+#[tauri::command]
+pub fn stop_game(id: String, state: State<'_, AppState>) -> Result<(), String> {
+    let marker = lock(&state.games)
+        .get(&id)
+        .map(|game| game.process_marker.clone())
+        .ok_or("Ce jeu n'est plus dans la liste, actualise la bibliothèque.")?;
+    process::stop_matching(&marker)
 }

@@ -1,3 +1,4 @@
+import { playtimeLabel } from "../format";
 import { DEFAULT_ACCENT, cssVariable } from "../images";
 import { gameCount } from "../plural";
 import { SOURCE_LABELS, SOURCE_ORDER } from "../sources";
@@ -61,6 +62,9 @@ export function LibraryShelves({
                   onDoubleClick={() => onLaunch(game)}
                 >
                   <CoverImage game={game} />
+                  {playtimeLabel(game.details.playtimeMinutes) && (
+                    <span className="shelf-badge">{playtimeLabel(game.details.playtimeMinutes)}</span>
+                  )}
                 </button>
               </li>
             ))}

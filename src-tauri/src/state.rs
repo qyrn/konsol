@@ -1,6 +1,7 @@
 use crate::config::{ConfigStore, KonsolConfig};
 use crate::game::Game;
 use crate::metadata::MetadataStore;
+use crate::playtime::PlaytimeStore;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -12,6 +13,8 @@ pub struct AppState {
     pub games: Mutex<HashMap<String, Game>>,
     pub accents: Mutex<HashMap<PathBuf, Option<String>>>,
     pub metadata: Mutex<MetadataStore>,
+    pub playtime: Mutex<PlaytimeStore>,
+    pub running: Mutex<Vec<String>>,
     pub enriching: AtomicBool,
     pub applications_dir: PathBuf,
     pub taskbar_icons_dir: PathBuf,

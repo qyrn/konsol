@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Achievement, Game, Settings } from "./types";
+import type { Achievement, Game, NewManualGame, Preferences, Settings } from "./types";
 
 export const LIBRARY_EVENT = "library-changed";
 export const ACHIEVEMENT_EVENT = "achievement-unlocked";
@@ -24,8 +24,16 @@ export function renameGame(id: string, title: string): Promise<void> {
   return invoke("rename_game", { id, title });
 }
 
-export function addManualGame(title: string, executable: string): Promise<string> {
-  return invoke<string>("add_manual_game", { title, executable });
+export function addManualGame(game: NewManualGame): Promise<string> {
+  return invoke<string>("add_manual_game", { game });
+}
+
+export function stopGame(id: string): Promise<void> {
+  return invoke("stop_game", { id });
+}
+
+export function savePreferences(preferences: Preferences): Promise<void> {
+  return invoke("save_preferences", { preferences });
 }
 
 export function removeManualGame(id: string): Promise<void> {

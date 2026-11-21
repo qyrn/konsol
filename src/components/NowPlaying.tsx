@@ -5,6 +5,9 @@ import { CoverImage } from "./CoverImage";
 interface NowPlayingProps {
   game: Game;
   startedAt: number;
+  returnsWhenDone: boolean;
+  stopping: boolean;
+  onStop: () => void;
 }
 
 function twoDigits(value: number): string {
@@ -16,7 +19,7 @@ function sessionDuration(milliseconds: number): string {
   return `${twoDigits(seconds / 3600)}:${twoDigits((seconds / 60) % 60)}:${twoDigits(seconds % 60)}`;
 }
 
-export function NowPlaying({ game, startedAt }: NowPlayingProps) {
+export function NowPlaying({ game, startedAt, returnsWhenDone, stopping, onStop }: NowPlayingProps) {
   const now = useNow(1000);
 
   return (
@@ -30,9 +33,16 @@ export function NowPlaying({ game, startedAt }: NowPlayingProps) {
         En jeu
       </p>
       <p className="now-playing-timer">{sessionDuration(now - startedAt)}</p>
-      {game.achievements && (
-        <p className="now-playing-hint">Tes succès s'affichent en notification dès que tu les débloques !</p>
-      )}
+      <p className="now-playing-hint">
+        {returnsWhenDone
+          ? `Konsol revient au premier plan quand tu quittes ${game.title}.`
+          : game.achievements
+            ? "Tes succès s'affichent en notification dès que tu les débloques !"
+            : "Bon jeu ! Ton temps de jeu se met à jour quand tu quittes."}
+      </p>
+      <button type="button" className="glass-button" disabled={stopping} onClick={onStop}>
+        {stopping ? "Ça s'arrête…" : "Arrêter la session"}
+      </button>
     </section>
   );
 }

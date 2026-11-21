@@ -2,20 +2,24 @@ import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useState } from "react";
 import { gameCount } from "../plural";
 import { SOURCE_LABELS, SOURCE_ORDER } from "../sources";
-import type { Game, GameSource } from "../types";
+import type { Game, GameSource, Preferences } from "../types";
 import { ApiKeysSettings } from "./ApiKeysSettings";
 import { BrandMark } from "./BrandMark";
+import { GeneralSettings } from "./GeneralSettings";
 
-type SettingsTab = "sources" | "keys" | "about";
+type SettingsTab = "general" | "sources" | "keys" | "about";
 
 interface SettingsPageProps {
   games: Game[];
   scanning: boolean;
+  preferences: Preferences;
+  onPreferencesChange: (preferences: Preferences) => void;
   onRescan: () => void;
   onKeysSaved: () => void;
 }
 
 const TAB_LABELS: Record<SettingsTab, string> = {
+  general: "Général",
   sources: "Sources",
   keys: "Clés API",
   about: "À propos",
@@ -30,7 +34,11 @@ const SOURCE_LOCATIONS: Record<GameSource, string> = {
   manual: "~/.config/dev.qyrn.konsol/config.json",
 };
 
-function SourcesSettings({ games, scanning, onRescan }: Omit<SettingsPageProps, "onKeysSaved">) {
+function SourcesSettings({
+  games,
+  scanning,
+  onRescan,
+}: Pick<SettingsPageProps, "games" | "scanning" | "onRescan">) {
   return (
     <>
       <div className="settings-section-header">
@@ -84,8 +92,15 @@ function AboutSettings() {
   );
 }
 
-export function SettingsPage({ games, scanning, onRescan, onKeysSaved }: SettingsPageProps) {
-  const [tab, setTab] = useState<SettingsTab>("sources");
+export function SettingsPage({
+  games,
+  scanning,
+  preferences,
+  onPreferencesChange,
+  onRescan,
+  onKeysSaved,
+}: SettingsPageProps) {
+  const [tab, setTab] = useState<SettingsTab>("general");
 
   return (
     <section className="settings">
@@ -108,6 +123,7 @@ export function SettingsPage({ games, scanning, onRescan, onKeysSaved }: Setting
         </div>
         <div className="settings-content">
           <h2>{TAB_LABELS[tab]}</h2>
+          {tab === "general" && <GeneralSettings preferences={preferences} onChange={onPreferencesChange} />}
           {tab === "sources" && <SourcesSettings games={games} scanning={scanning} onRescan={onRescan} />}
           {tab === "keys" && <ApiKeysSettings onSaved={onKeysSaved} />}
           {tab === "about" && <AboutSettings />}

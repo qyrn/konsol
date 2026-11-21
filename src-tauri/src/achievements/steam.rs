@@ -77,6 +77,7 @@ pub fn read(home: &Path, app_id: &str) -> Option<AchievementList> {
                     })
                     .map(|icon| format!("{ICON_BASE_URL}/{app_id}/{icon}")),
                 unlocked,
+                rarity_tenths: None,
                 unlocked_at: user_stat
                     .and_then(|stat| stat.get("AchievementTimes"))
                     .and_then(|times| times.get_text(bit))

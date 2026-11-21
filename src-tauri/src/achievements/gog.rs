@@ -33,6 +33,7 @@ pub fn read(home: &Path, app_name: &str) -> Option<AchievementList> {
                 icon_url: text(item, icon_key).filter(|url| url.starts_with("https://")),
                 unlocked,
                 unlocked_at,
+                rarity_tenths: None,
             })
         })
         .collect();

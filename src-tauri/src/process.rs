@@ -1,5 +1,6 @@
 use crate::game::ProcessMarker;
 use std::fs;
+use std::process::Command;
 
 struct ProcessSnapshot {
     environment: Vec<u8>,
@@ -49,6 +50,27 @@ pub fn any_process_matches(marker: &ProcessMarker) -> bool {
     running_pids()
         .into_iter()
         .any(|pid| process_matches(pid, marker))
+}
+
+pub fn stop_matching(marker: &ProcessMarker) -> Result<(), String> {
+    let pids: Vec<String> = running_pids()
+        .into_iter()
+        .filter(|pid| process_matches(*pid, marker))
+        .map(|pid| pid.to_string())
+        .collect();
+    if pids.is_empty() {
+        return Err("Le jeu ne tourne plus.".to_string());
+    }
+    let status = Command::new("kill")
+        .arg("-TERM")
+        .args(&pids)
+        .status()
+        .map_err(|error| format!("Impossible d'arrêter le jeu : {error}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err("Le jeu n'a pas voulu s'arrêter.".to_string())
+    }
 }
 
 pub fn running_keys<K>(markers: &[(K, ProcessMarker)]) -> Vec<&K> {

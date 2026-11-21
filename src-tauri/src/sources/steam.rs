@@ -1,5 +1,8 @@
-use crate::game::{AchievementSource, Game, GameSource, ImageSource, LaunchTarget, ProcessMarker};
+use crate::game::{
+    AchievementSource, Game, GameDetails, GameSource, ImageSource, LaunchTarget, ProcessMarker,
+};
 use crate::vdf::{self, VdfValue};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -11,12 +14,55 @@ const TOOL_NAME_PREFIXES: [&str; 3] = [
     "Steamworks Common Redistributables",
 ];
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct Playtime {
+    minutes: u64,
+    last_played: i64,
+}
+
 pub fn scan(home: &Path) -> Vec<Game> {
     let steam_root = home.join(".local/share/Steam");
+    let playtimes = read_playtimes(&steam_root);
     library_paths(&steam_root)
         .iter()
         .flat_map(|library| manifests_in(&library.join("steamapps")))
-        .filter_map(|manifest| game_from_manifest(&manifest, &steam_root, home))
+        .filter_map(|manifest| game_from_manifest(&manifest, &steam_root, home, &playtimes))
+        .collect()
+}
+
+fn read_playtimes(steam_root: &Path) -> HashMap<String, Playtime> {
+    let mut playtimes: HashMap<String, Playtime> = HashMap::new();
+    let Ok(users) = fs::read_dir(steam_root.join("userdata")) else {
+        return playtimes;
+    };
+    for user in users.filter_map(Result::ok) {
+        let Ok(content) = fs::read_to_string(user.path().join("config/localconfig.vdf")) else {
+            continue;
+        };
+        for (app_id, playtime) in playtimes_in(&vdf::parse(&content)) {
+            let known = playtimes.entry(app_id).or_default();
+            known.minutes = known.minutes.max(playtime.minutes);
+            known.last_played = known.last_played.max(playtime.last_played);
+        }
+    }
+    playtimes
+}
+
+fn playtimes_in(local_config: &VdfValue) -> Vec<(String, Playtime)> {
+    let apps = ["UserLocalConfigStore", "Software", "Valve", "Steam", "apps"]
+        .iter()
+        .try_fold(local_config, |value, key| value.get(key));
+    apps.map(VdfValue::entries)
+        .unwrap_or(&[])
+        .iter()
+        .map(|(app_id, app)| {
+            let number = |key: &str| app.get_text(key).and_then(|text| text.parse().ok());
+            let playtime = Playtime {
+                minutes: number("Playtime").map_or(0, |minutes: i64| minutes.max(0).unsigned_abs()),
+                last_played: number("LastPlayed").unwrap_or(0),
+            };
+            (app_id.clone(), playtime)
+        })
         .collect()
 }
 
@@ -62,7 +108,12 @@ fn manifests_in(steamapps: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-fn game_from_manifest(manifest: &Path, steam_root: &Path, home: &Path) -> Option<Game> {
+fn game_from_manifest(
+    manifest: &Path,
+    steam_root: &Path,
+    home: &Path,
+    playtimes: &HashMap<String, Playtime>,
+) -> Option<Game> {
     let content = fs::read_to_string(manifest).ok()?;
     let root = vdf::parse(&content);
     let app_state = root.get("AppState")?;
@@ -79,6 +130,27 @@ fn game_from_manifest(manifest: &Path, steam_root: &Path, home: &Path) -> Option
     let cover = find_art(&cache, app_id, "library_600x900.jpg");
     let icon_source =
         find_icon(home, app_id).or_else(|| cover.as_ref().and_then(ImageSource::local_path));
+    let playtime = playtimes.get(app_id).copied().unwrap_or_default();
+    let last_played = app_state
+        .get_text("LastPlayed")
+        .and_then(|text| text.parse::<i64>().ok())
+        .unwrap_or(0)
+        .max(playtime.last_played);
+    let details = GameDetails {
+        playtime_minutes: Some(playtime.minutes),
+        last_played: (last_played > 0).then_some(last_played),
+        size_bytes: app_state
+            .get_text("SizeOnDisk")
+            .and_then(|text| text.parse().ok())
+            .filter(|size| *size > 0),
+        location: app_state.get_text("installdir").and_then(|directory| {
+            manifest
+                .parent()
+                .map(|steamapps| steamapps.join("common").join(directory))
+                .map(|path| path.to_string_lossy().into_owned())
+        }),
+        ..GameDetails::default()
+    };
     Some(Game {
         id: format!("steam:{app_id}"),
         title: name.to_string(),
@@ -88,6 +160,7 @@ fn game_from_manifest(manifest: &Path, steam_root: &Path, home: &Path) -> Option
         accent: None,
         hidden: false,
         achievements: None,
+        details,
         launch: LaunchTarget::SteamApp(app_id.to_string()),
         process_marker: ProcessMarker::EnvVar {
             name: "SteamAppId",
@@ -132,6 +205,25 @@ fn find_icon(home: &Path, app_id: &str) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_playtime_and_last_session_from_local_config() {
+        let config = vdf::parse(
+            r#""UserLocalConfigStore" { "Software" { "Valve" { "Steam" { "apps" {
+                "250900" { "LastPlayed" "1795257247" "Playtime" "12180" }
+                "570" { "cloud" { } }
+            } } } } }"#,
+        );
+        let playtimes: HashMap<_, _> = playtimes_in(&config).into_iter().collect();
+        assert_eq!(
+            playtimes["250900"],
+            Playtime {
+                minutes: 12180,
+                last_played: 1795257247
+            }
+        );
+        assert_eq!(playtimes["570"], Playtime::default());
+    }
 
     #[test]
     fn filters_out_steam_tools() {

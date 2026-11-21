@@ -1,3 +1,4 @@
+mod disk_usage;
 pub mod http;
 mod steam_store;
 mod steam_web;
@@ -20,9 +21,26 @@ pub struct GameMetadata {
     pub hero: Option<PathBuf>,
     pub icon: Option<PathBuf>,
     pub achievement_schema: Option<Vec<SchemaEntry>>,
+    pub developer: Option<String>,
+    pub year: Option<u16>,
+    pub genre: Option<String>,
+    pub size_bytes: Option<u64>,
+    pub achievement_rarity: Option<HashMap<String, u16>>,
     pub store_lookup_done: bool,
     pub grid_lookup_done: bool,
     pub schema_lookup_done: bool,
+    pub details_lookup_done: bool,
+    pub size_lookup_done: bool,
+    pub rarity_lookup_done: bool,
+}
+
+impl GameMetadata {
+    fn store_app_id(&self, game: &Game) -> Option<u32> {
+        if game.source == GameSource::Steam {
+            return game.id.trim_start_matches("steam:").parse().ok();
+        }
+        self.steam_app_id
+    }
 }
 
 #[derive(Clone, Default)]
@@ -62,6 +80,10 @@ impl MetadataStore {
         {
             let _ = fs::write(&self.path, content);
         }
+    }
+
+    pub fn achievement_rarity(&self, game_id: &str) -> Option<&HashMap<String, u16>> {
+        self.get(game_id)?.achievement_rarity.as_ref()
     }
 
     pub fn emulator_schema(&self, game_id: &str) -> Option<&[SchemaEntry]> {
@@ -112,7 +134,10 @@ pub fn apply(games: Vec<Game>, store: &MetadataStore) -> Vec<Game> {
                 != Some(true)
         })
         .map(|mut game| {
-            if let Some(metadata) = store.get(&game.id).filter(|_| game.needs_store_artwork()) {
+            let Some(metadata) = store.get(&game.id) else {
+                return game;
+            };
+            if game.needs_store_artwork() && game.cover.is_none() {
                 let existing = |path: &Option<PathBuf>| path.clone().filter(|path| path.is_file());
                 if let Some(cover) = existing(&metadata.cover) {
                     game.cover = Some(ImageSource::File(cover.to_string_lossy().into_owned()));
@@ -122,6 +147,11 @@ pub fn apply(games: Vec<Game>, store: &MetadataStore) -> Vec<Game> {
                 }
                 game.icon_source = existing(&metadata.icon).or_else(|| existing(&metadata.cover));
             }
+            let details = &mut game.details;
+            details.developer = details.developer.take().or(metadata.developer.clone());
+            details.genre = metadata.genre.clone().or(details.genre.take());
+            details.year = details.year.or(metadata.year);
+            details.size_bytes = details.size_bytes.or(metadata.size_bytes);
             game
         })
         .collect()
@@ -139,23 +169,39 @@ struct PendingSteps {
     store_lookup: bool,
     grid_lookup: bool,
     schema_lookup: bool,
+    details_lookup: bool,
+    size_lookup: bool,
+    rarity_lookup: bool,
 }
 
 impl PendingSteps {
     fn any_pending(&self) -> bool {
-        self.software_check || self.store_lookup || self.grid_lookup || self.schema_lookup
+        self.software_check
+            || self.store_lookup
+            || self.grid_lookup
+            || self.schema_lookup
+            || self.details_lookup
+            || self.size_lookup
+            || self.rarity_lookup
     }
 }
 
 fn pending_steps(game: &Game, metadata: &GameMetadata, keys: &ApiKeys) -> PendingSteps {
-    let artwork_game = game.needs_store_artwork();
+    let artwork_game = game.needs_store_artwork() && game.cover.is_none();
     let has_emulator_stats = matches!(
         game.achievement_source,
         Some(AchievementSource::EmulatorStats { .. })
     );
+    let has_steam_achievements = has_emulator_stats
+        || matches!(
+            game.achievement_source,
+            Some(AchievementSource::Steam { .. })
+        );
+    let app_id_known = metadata.store_app_id(game).is_some();
+    let is_game = metadata.is_software != Some(true);
     PendingSteps {
         software_check: game.source == GameSource::Steam && metadata.is_software.is_none(),
-        store_lookup: artwork_game && !metadata.store_lookup_done,
+        store_lookup: game.source != GameSource::Steam && !metadata.store_lookup_done,
         grid_lookup: artwork_game
             && keys.steam_grid_db.is_some()
             && metadata.cover.is_none()
@@ -164,6 +210,16 @@ fn pending_steps(game: &Game, metadata: &GameMetadata, keys: &ApiKeys) -> Pendin
             && keys.steam_web.is_some()
             && !metadata.schema_lookup_done
             && (metadata.steam_app_id.is_some() || !metadata.store_lookup_done),
+        details_lookup: is_game
+            && !metadata.details_lookup_done
+            && (app_id_known || (game.source != GameSource::Steam && !metadata.store_lookup_done)),
+        size_lookup: game.details.size_bytes.is_none()
+            && game.details.location.is_some()
+            && !metadata.size_lookup_done,
+        rarity_lookup: is_game
+            && has_steam_achievements
+            && !metadata.rarity_lookup_done
+            && (app_id_known || !metadata.store_lookup_done),
     }
 }
 
@@ -172,6 +228,7 @@ pub fn enrich(
     snapshot: HashMap<String, GameMetadata>,
     keys: &ApiKeys,
     images_dir: &Path,
+    home: &Path,
 ) -> HashMap<String, GameMetadata> {
     let agent = http::agent();
     let mut updates = HashMap::new();
@@ -181,6 +238,14 @@ pub fn enrich(
             continue;
         }
         enrich_game(&agent, game, &mut metadata, keys, images_dir);
+        if pending_steps(game, &metadata, keys).size_lookup {
+            metadata.size_bytes = game
+                .details
+                .location
+                .as_deref()
+                .and_then(|location| disk_usage::game_folder_size(home, Path::new(location)));
+            metadata.size_lookup_done = true;
+        }
         updates.insert(game.id.clone(), metadata);
     }
     updates
@@ -209,6 +274,7 @@ fn enrich_game(
         metadata.steam_app_id = steam_store::find_app_id(agent, &game.title);
         if let Some(art) = metadata
             .steam_app_id
+            .filter(|_| game.needs_store_artwork() && game.cover.is_none())
             .and_then(|app_id| steam_store::art(agent, app_id))
         {
             metadata.cover = fetch(art.cover, "cover");
@@ -233,5 +299,19 @@ fn enrich_game(
     {
         metadata.achievement_schema = steam_web::achievement_schema(agent, key, app_id);
         metadata.schema_lookup_done = true;
+    }
+    let app_id = metadata.store_app_id(game);
+    if pending_steps(game, metadata, keys).details_lookup {
+        if let Some(details) = app_id.and_then(|app_id| steam_store::details(agent, app_id)) {
+            metadata.developer = details.developer;
+            metadata.year = details.year;
+            metadata.genre = details.genre;
+        }
+        metadata.details_lookup_done = true;
+    }
+    if pending_steps(game, metadata, keys).rarity_lookup {
+        metadata.achievement_rarity =
+            app_id.and_then(|app_id| steam_web::achievement_rarity(agent, app_id));
+        metadata.rarity_lookup_done = true;
     }
 }

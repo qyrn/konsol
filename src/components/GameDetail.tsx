@@ -1,3 +1,4 @@
+import { lastPlayedLabel, playtimeLabel, sizeLabel } from "../format";
 import type { LaunchStatus } from "../launchStatus";
 import { SOURCE_LABELS } from "../sources";
 import { titleSizeClass } from "../titleSize";
@@ -17,6 +18,32 @@ interface GameDetailProps {
   onOpenAchievements: () => void;
 }
 
+interface Stat {
+  label: string;
+  value: string;
+  small?: boolean;
+}
+
+function detailStats(game: Game): Stat[] {
+  const { details, achievements } = game;
+  const stats: (Stat | null)[] = [
+    { label: "Temps de jeu", value: playtimeLabel(details.playtimeMinutes) ?? "0 h" },
+    achievements && {
+      label: achievements.total ? "Succès" : "Succès débloqués",
+      value: achievementCountLabel(achievements),
+    },
+    sizeLabel(details.sizeBytes) !== null
+      ? { label: "Sur le disque", value: sizeLabel(details.sizeBytes) ?? "" }
+      : null,
+    {
+      label: "Dernière session",
+      value: lastPlayedLabel(details.lastPlayed, Date.now()) ?? "Jamais lancé",
+      small: true,
+    },
+  ];
+  return stats.filter((stat): stat is Stat => stat !== null);
+}
+
 export function GameDetail({
   game,
   status,
@@ -27,11 +54,8 @@ export function GameDetail({
   onRemove,
   onOpenAchievements,
 }: GameDetailProps) {
-  const achievements = game.achievements;
-  const progress =
-    achievements?.total && achievements.total > 0
-      ? Math.round((achievements.unlocked / achievements.total) * 100)
-      : null;
+  const { details } = game;
+  const meta = [details.developer, details.year?.toString(), details.genre].filter(Boolean);
 
   return (
     <section className="detail">
@@ -42,7 +66,7 @@ export function GameDetail({
         <button type="button" className="back-link" onClick={onBack}>
           ← Bibliothèque
         </button>
-        <p className="detail-meta">{SOURCE_LABELS[game.source]}</p>
+        <p className="detail-meta">{meta.length > 0 ? meta.join(" · ") : SOURCE_LABELS[game.source]}</p>
         <h1 className={`detail-title ${titleSizeClass(game.title)}`}>{game.title}</h1>
         <div className="stage-actions detail-actions">
           <LaunchButton status={status} onLaunch={() => onLaunch(game)} />
@@ -59,27 +83,25 @@ export function GameDetail({
             </button>
           )}
         </div>
-        {achievements && (
-          <>
-            <dl className="detail-stats">
-              <div>
-                <dt>{achievements.total ? "Succès" : "Succès débloqués"}</dt>
-                <dd>{achievementCountLabel(achievements)}</dd>
-              </div>
-              {progress !== null && (
-                <div>
-                  <dt>Progression</dt>
-                  <dd>{progress} %</dd>
-                </div>
-              )}
-            </dl>
-            <div className="detail-footer">
-              <button type="button" className="glass-button small-pill" onClick={onOpenAchievements}>
-                Voir les succès
-              </button>
+        <dl className="detail-stats">
+          {detailStats(game).map((stat) => (
+            <div key={stat.label} data-small={stat.small ?? false}>
+              <dt>{stat.label}</dt>
+              <dd>{stat.value}</dd>
             </div>
-          </>
-        )}
+          ))}
+        </dl>
+        <div className="detail-footer">
+          <div className="detail-location">
+            <p>Emplacement · {SOURCE_LABELS[game.source]}</p>
+            {details.location && <p className="monospace">{details.location}</p>}
+          </div>
+          {game.achievements && (
+            <button type="button" className="glass-button small-pill" onClick={onOpenAchievements}>
+              Voir les succès
+            </button>
+          )}
+        </div>
       </div>
     </section>
   );

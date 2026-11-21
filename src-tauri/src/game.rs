@@ -61,6 +61,18 @@ pub struct AchievementSummary {
     pub total: Option<usize>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameDetails {
+    pub playtime_minutes: Option<u64>,
+    pub last_played: Option<i64>,
+    pub size_bytes: Option<u64>,
+    pub developer: Option<String>,
+    pub year: Option<u16>,
+    pub genre: Option<String>,
+    pub location: Option<String>,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Game {
@@ -72,6 +84,7 @@ pub struct Game {
     pub accent: Option<String>,
     pub hidden: bool,
     pub achievements: Option<AchievementSummary>,
+    pub details: GameDetails,
     #[serde(skip)]
     pub launch: LaunchTarget,
     #[serde(skip)]
@@ -104,10 +117,15 @@ impl Game {
             accent: None,
             hidden: false,
             achievements: None,
+            details: GameDetails::default(),
             launch,
             icon_source: None,
             achievement_source: None,
         }
+    }
+
+    pub fn playtime_tracked_by_konsol(&self) -> bool {
+        matches!(self.source, GameSource::Desktop | GameSource::Manual)
     }
 
     pub fn needs_store_artwork(&self) -> bool {

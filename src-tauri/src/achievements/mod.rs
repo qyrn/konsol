@@ -15,6 +15,7 @@ pub struct Achievement {
     pub icon_url: Option<String>,
     pub unlocked: bool,
     pub unlocked_at: Option<i64>,
+    pub rarity_tenths: Option<u16>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

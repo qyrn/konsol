@@ -3,7 +3,7 @@ mod heroic;
 mod steam;
 
 use crate::config::KonsolConfig;
-use crate::game::{Game, GameSource, LaunchTarget};
+use crate::game::{Game, GameSource, ImageSource, LaunchTarget};
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -27,12 +27,31 @@ pub fn scan_all(home: &Path, config: &KonsolConfig) -> Vec<Game> {
 
 fn manual_games(config: &KonsolConfig) -> impl Iterator<Item = Game> + '_ {
     config.manual_games.iter().map(|manual| {
-        Game::launched_by_konsol(
+        let launch = if manual.arguments.is_empty() {
+            LaunchTarget::Program(manual.executable.clone())
+        } else {
+            LaunchTarget::Command {
+                arguments: std::iter::once(manual.executable.to_string_lossy().into_owned())
+                    .chain(manual.arguments.iter().cloned())
+                    .collect(),
+                working_directory: manual.executable.parent().map(Path::to_path_buf),
+            }
+        };
+        let mut game = Game::launched_by_konsol(
             manual.id.clone(),
             manual.title.clone(),
             GameSource::Manual,
-            LaunchTarget::Program(manual.executable.clone()),
-        )
+            launch,
+        );
+        game.details.location = Some(manual.executable.to_string_lossy().into_owned());
+        game.accent = manual.accent.clone();
+        game.cover = manual
+            .cover
+            .as_ref()
+            .filter(|path| path.is_file())
+            .map(|path| ImageSource::File(path.to_string_lossy().into_owned()));
+        game.icon_source = manual.cover.clone().filter(|path| path.is_file());
+        game
     })
 }
 

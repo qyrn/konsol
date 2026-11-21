@@ -25,6 +25,52 @@ pub struct StoreArt {
     pub icon: Option<String>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct StoreDetails {
+    pub developer: Option<String>,
+    pub year: Option<u16>,
+    pub genre: Option<String>,
+}
+
+pub fn details(agent: &Agent, app_id: u32) -> Option<StoreDetails> {
+    let app_id = app_id.to_string();
+    let response = http::get_json(
+        agent,
+        "https://store.steampowered.com/api/appdetails",
+        &[
+            ("appids", &app_id),
+            ("filters", "genres,release_date,developers"),
+            ("l", "french"),
+        ],
+        None,
+    )?;
+    let data = response.get(&app_id)?.get("data")?;
+    let first_text = |list: Option<&Value>, field: Option<&str>| {
+        let item = list?.as_array()?.first()?;
+        let text = match field {
+            Some(field) => item.get(field)?,
+            None => item,
+        };
+        text.as_str().map(str::to_string)
+    };
+    Some(StoreDetails {
+        developer: first_text(data.get("developers"), None),
+        genre: first_text(data.get("genres"), Some("description")),
+        year: data
+            .get("release_date")
+            .and_then(|release| release.get("date"))
+            .and_then(Value::as_str)
+            .and_then(release_year),
+    })
+}
+
+fn release_year(date: &str) -> Option<u16> {
+    date.split(|character: char| !character.is_ascii_digit())
+        .filter(|part| part.len() == 4)
+        .filter_map(|part| part.parse().ok())
+        .next_back()
+}
+
 pub fn normalized_title(title: &str) -> String {
     title
         .chars()
@@ -117,6 +163,13 @@ pub fn is_software(agent: &Agent, app_id: &str) -> Option<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn finds_the_year_in_localized_release_dates() {
+        assert_eq!(release_year("4 nov. 2014"), Some(2014));
+        assert_eq!(release_year("Nov 4, 2014"), Some(2014));
+        assert_eq!(release_year("Bientôt"), None);
+    }
 
     #[test]
     fn normalizes_titles_for_exact_matching() {

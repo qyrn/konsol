@@ -14,6 +14,7 @@ pub struct KonsolConfig {
     pub custom_titles: BTreeMap<String, String>,
     pub steam_grid_db_api_key: Option<String>,
     pub steam_web_api_key: Option<String>,
+    pub preferences: Preferences,
 }
 
 impl KonsolConfig {
@@ -31,6 +32,32 @@ pub struct ManualGame {
     pub id: String,
     pub title: String,
     pub executable: PathBuf,
+    #[serde(default)]
+    pub arguments: Vec<String>,
+    #[serde(default)]
+    pub accent: Option<String>,
+    #[serde(default)]
+    pub cover: Option<PathBuf>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Preferences {
+    pub launch_at_login: bool,
+    pub minimize_during_session: bool,
+    pub accent_follows_game: bool,
+    pub reduce_motion: bool,
+}
+
+impl Default for Preferences {
+    fn default() -> Self {
+        Self {
+            launch_at_login: false,
+            minimize_during_session: false,
+            accent_follows_game: true,
+            reduce_motion: false,
+        }
+    }
 }
 
 pub struct ConfigStore {

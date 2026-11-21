@@ -77,7 +77,7 @@ fn unescape_value(value: &str) -> String {
     result
 }
 
-fn split_exec(exec: &str) -> Option<Vec<String>> {
+pub fn split_exec(exec: &str) -> Option<Vec<String>> {
     let mut arguments = Vec::new();
     let mut current = String::new();
     let mut has_token = false;
