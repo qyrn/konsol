@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { errorMessage, launchGame, removeManualGame, setGameHidden } from "./api";
 import { AddGameForm } from "./components/AddGameForm";
-import { GameGrid } from "./components/GameGrid";
-import { LaunchDock } from "./components/LaunchDock";
-import { SourceFilter, type SourceFilterValue } from "./components/SourceFilter";
+import { Backdrop } from "./components/Backdrop";
+import { GameStage } from "./components/GameStage";
+import { GameTray } from "./components/GameTray";
+import { Rail, type SourceFilterValue } from "./components/Rail";
+import { DEFAULT_ACCENT, cssVariable } from "./images";
 import type { Game } from "./types";
 import { useLibrary } from "./useLibrary";
 
 const NOTICE_DURATION_MS = 4000;
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+}
 
 export function App() {
   const library = useLibrary();
@@ -40,7 +46,7 @@ export function App() {
     );
   }, [shelfGames, sourceFilter, query]);
 
-  const selectedGame = library.games.find((game) => game.id === selectedId) ?? null;
+  const selectedGame = visibleGames.find((game) => game.id === selectedId) ?? visibleGames[0] ?? null;
 
   async function handleLaunch(game: Game) {
     setSelectedId(game.id);
@@ -54,6 +60,25 @@ export function App() {
       setLaunchingId(null);
     }
   }
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (addingGame || isTypingTarget(event.target) || visibleGames.length === 0) return;
+      const index = selectedGame ? visibleGames.indexOf(selectedGame) : 0;
+      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        const step = event.key === "ArrowRight" ? 1 : -1;
+        const next = visibleGames[(index + step + visibleGames.length) % visibleGames.length];
+        if (next) setSelectedId(next.id);
+      }
+      if (event.key === "Enter" && !(event.target instanceof HTMLButtonElement) && selectedGame) {
+        event.preventDefault();
+        void handleLaunch(selectedGame);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
 
   async function runAndReload(action: () => Promise<void>, successNotice: string) {
     try {
@@ -84,83 +109,73 @@ export function App() {
     void library.reload();
   }
 
+  const emptyMessage = query.trim()
+    ? `Rien ne correspond à « ${query.trim()} ».`
+    : "Aucun jeu trouvé pour l'instant. Si t'as des jeux sans launcher, ajoute-les à la main !";
+
   return (
-    <div className="app">
-      <aside className="sidebar">
-        <h1 className="brand">Konsol</h1>
-        <SourceFilter games={shelfGames} value={sourceFilter} onChange={setSourceFilter} />
-        <div className="sidebar-footer">
-          {hiddenCount > 0 && (
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={showHidden}
-                onChange={(event) => setShowHidden(event.target.checked)}
-              />
-              Voir les jeux masqués ({hiddenCount})
-            </label>
-          )}
-          <button type="button" className="quiet-button" onClick={() => setAddingGame(true)}>
-            Ajouter un jeu
-          </button>
-        </div>
-      </aside>
+    <div className="app" style={cssVariable("--accent", selectedGame?.accent ?? DEFAULT_ACCENT)}>
+      <Backdrop game={selectedGame} />
 
-      <main className="library">
-        <header className="toolbar">
-          <input
-            type="search"
-            className="search"
-            placeholder="Cherche un jeu…"
-            aria-label="Chercher un jeu"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <button
-            type="button"
-            className="quiet-button"
-            disabled={library.loading}
-            onClick={() => void library.reload()}
-          >
-            {library.loading ? "Ça cherche…" : "Actualiser"}
-          </button>
-        </header>
+      <Rail
+        games={shelfGames}
+        filter={sourceFilter}
+        hiddenCount={hiddenCount}
+        showHidden={showHidden}
+        onFilterChange={setSourceFilter}
+        onShowHiddenChange={setShowHidden}
+        onAddGame={() => setAddingGame(true)}
+      />
 
-        <section className="shelf">
-          {addingGame ? (
-            <AddGameForm onAdded={handleAdded} onCancel={() => setAddingGame(false)} />
-          ) : library.error ? (
-            <p className="shelf-message" role="alert">
-              {library.error}
-            </p>
-          ) : visibleGames.length > 0 ? (
-            <GameGrid
-              games={visibleGames}
-              selectedId={selectedId}
-              onSelect={(game) => setSelectedId(game.id)}
-              onLaunch={(game) => void handleLaunch(game)}
-            />
-          ) : (
-            !library.loading && (
-              <p className="shelf-message">
-                {query.trim()
-                  ? `Rien ne correspond à « ${query.trim()} ».`
-                  : "Aucun jeu trouvé pour l'instant. Si t'as des jeux sans launcher, ajoute-les à la main !"}
-              </p>
-            )
-          )}
-        </section>
-
-        <LaunchDock
-          game={selectedGame}
-          launching={launchingId !== null && launchingId === selectedId}
-          onLaunch={(game) => void handleLaunch(game)}
-          onToggleHidden={handleToggleHidden}
-          onRemove={handleRemove}
+      <header className="toolbar">
+        <input
+          type="search"
+          className="search glass"
+          placeholder="Cherche un jeu…"
+          aria-label="Chercher un jeu"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
         />
+        <button
+          type="button"
+          className="glass-button"
+          disabled={library.loading}
+          onClick={() => void library.reload()}
+        >
+          {library.loading ? "Ça cherche…" : "Actualiser"}
+        </button>
+      </header>
+
+      <main className="main">
+        {library.error ? (
+          <p className="message" role="alert">
+            {library.error}
+          </p>
+        ) : selectedGame ? (
+          <GameStage
+            game={selectedGame}
+            launching={launchingId === selectedGame.id}
+            onLaunch={(game) => void handleLaunch(game)}
+            onToggleHidden={handleToggleHidden}
+            onRemove={handleRemove}
+          />
+        ) : (
+          !library.loading && <p className="message">{emptyMessage}</p>
+        )}
       </main>
 
-      <div className="notice" role="status" aria-live="polite">
+      {visibleGames.length > 0 && (
+        <GameTray
+          games={visibleGames}
+          selectedId={selectedGame?.id ?? null}
+          onSelect={(game) => setSelectedId(game.id)}
+          onLaunch={(game) => void handleLaunch(game)}
+        />
+      )}
+
+      {addingGame && <AddGameForm onAdded={handleAdded} onCancel={() => setAddingGame(false)} />}
+
+      <div className="notice glass" role="status" aria-live="polite">
         {notice}
       </div>
     </div>

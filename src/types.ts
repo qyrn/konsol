@@ -1,11 +1,13 @@
 export type GameSource = "steam" | "gog" | "epic" | "amazon" | "script" | "manual";
 
-export type Cover = { kind: "file"; value: string } | { kind: "url"; value: string };
+export type ImageSource = { kind: "file"; value: string } | { kind: "url"; value: string };
 
 export interface Game {
   id: string;
   title: string;
   source: GameSource;
-  cover: Cover | null;
+  cover: ImageSource | null;
+  hero: ImageSource | null;
+  accent: string | null;
   hidden: boolean;
 }

@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, type KeyboardEvent, useState } from "react";
 import { addManualGame, errorMessage } from "../api";
 
 interface AddGameFormProps {
@@ -25,46 +25,59 @@ export function AddGameForm({ onAdded, onCancel }: AddGameFormProps) {
     }
   }
 
+  function handleKeyDown(event: KeyboardEvent<HTMLFormElement>) {
+    if (event.key === "Escape") onCancel();
+  }
+
   return (
-    <form className="add-form" onSubmit={handleSubmit}>
-      <h2>Ajouter un jeu</h2>
-      <p className="add-form-help">
-        Pour un jeu sans launcher, genre un repack ou un recomp, mets juste le chemin complet du fichier qui
-        le lance.
-      </p>
-      <label>
-        Nom du jeu
-        <input
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          maxLength={120}
-          required
-          autoFocus
-        />
-      </label>
-      <label>
-        Chemin de l'exécutable
-        <input
-          value={executable}
-          onChange={(event) => setExecutable(event.target.value)}
-          placeholder="/home/…/Skate3Recomp-Linux/skate3"
-          spellCheck={false}
-          required
-        />
-      </label>
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
+    <div className="modal-layer">
+      <form
+        className="add-form glass"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-game-title"
+        onSubmit={handleSubmit}
+        onKeyDown={handleKeyDown}
+      >
+        <h2 id="add-game-title">Ajouter un jeu</h2>
+        <p className="add-form-help">
+          Pour un jeu sans launcher, genre un repack ou un recomp, mets juste le chemin complet du fichier qui
+          le lance.
         </p>
-      )}
-      <div className="add-form-actions">
-        <button type="button" className="quiet-button" onClick={onCancel}>
-          Annuler
-        </button>
-        <button type="submit" className="launch-button" disabled={saving}>
-          Ajouter
-        </button>
-      </div>
-    </form>
+        <label>
+          Nom du jeu
+          <input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            maxLength={120}
+            required
+            autoFocus
+          />
+        </label>
+        <label>
+          Chemin de l'exécutable
+          <input
+            value={executable}
+            onChange={(event) => setExecutable(event.target.value)}
+            placeholder="/home/…/Skate3Recomp-Linux/skate3"
+            spellCheck={false}
+            required
+          />
+        </label>
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="add-form-actions">
+          <button type="button" className="glass-button" onClick={onCancel}>
+            Annuler
+          </button>
+          <button type="submit" className="launch-button" disabled={saving}>
+            Ajouter
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
