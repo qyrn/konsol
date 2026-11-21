@@ -1,5 +1,6 @@
 use super::http;
-use crate::achievements::SchemaEntry;
+use crate::achievements::{Achievement, SchemaEntry};
+use crate::steam_cdn::community_image;
 use serde_json::Value;
 use std::collections::HashMap;
 use ureq::Agent;
@@ -25,7 +26,9 @@ pub fn achievement_schema(agent: &Agent, key: &str, app_id: u32) -> Option<Vec<S
                 api_name: text(item, "name")?,
                 name: text(item, "displayName")?,
                 description: text(item, "description").unwrap_or_default(),
-                icon_url: text(item, "icon").filter(|url| url.starts_with("https://")),
+                icon_url: text(item, "icon")
+                    .filter(|url| url.starts_with("https://"))
+                    .map(|url| community_image(&url)),
             })
         })
         .collect();
@@ -56,4 +59,56 @@ pub fn achievement_rarity(agent: &Agent, app_id: u32) -> Option<HashMap<String, 
         })
         .collect();
     Some(rarity)
+}
+
+pub fn player_achievements(
+    agent: &Agent,
+    key: &str,
+    steam_id: &str,
+    app_id: u32,
+) -> Option<Vec<Achievement>> {
+    let schema = achievement_schema(agent, key, app_id).unwrap_or_default();
+    let app_id = app_id.to_string();
+    let response = http::get_json(
+        agent,
+        "https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/",
+        &[
+            ("key", key),
+            ("steamid", steam_id),
+            ("appid", &app_id),
+            ("l", "french"),
+        ],
+        None,
+    )?;
+    let list = response
+        .get("playerstats")?
+        .get("achievements")?
+        .as_array()?;
+    Some(
+        list.iter()
+            .filter_map(|item| {
+                let api_name = item.get("apiname")?.as_str()?.to_string();
+                let entry = schema.iter().find(|entry| entry.api_name == api_name);
+                let unlocked = item.get("achieved").and_then(Value::as_u64) == Some(1);
+                let text =
+                    |field: &str| item.get(field).and_then(Value::as_str).map(str::to_string);
+                Some(Achievement {
+                    name: text("name")
+                        .or_else(|| entry.map(|entry| entry.name.clone()))
+                        .unwrap_or_else(|| api_name.clone()),
+                    description: text("description")
+                        .or_else(|| entry.map(|entry| entry.description.clone()))
+                        .unwrap_or_default(),
+                    icon_url: entry.and_then(|entry| entry.icon_url.clone()),
+                    unlocked,
+                    unlocked_at: item
+                        .get("unlocktime")
+                        .and_then(Value::as_i64)
+                        .filter(|time| unlocked && *time > 0),
+                    rarity_tenths: None,
+                    id: api_name,
+                })
+            })
+            .collect(),
+    )
 }
