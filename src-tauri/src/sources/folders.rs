@@ -1,3 +1,4 @@
+use super::rockstar;
 use crate::game::{AchievementSource, Game, GameSource, LaunchTarget, ProcessMarker};
 use std::collections::HashSet;
 use std::fs::{self, File};
@@ -104,20 +105,72 @@ pub fn default_folders(home: &Path) -> Vec<PathBuf> {
 }
 
 pub fn scan(folders: &[PathBuf], known_targets: &HashSet<PathBuf>) -> Vec<Game> {
-    folders
+    let found: Vec<GameFolder> = folders
         .iter()
         .flat_map(|folder| game_folders(folder, 0))
+        .collect();
+    let mut games: Vec<Game> = found
+        .iter()
         .filter_map(|folder| {
             let Some(executable) = main_executable(&folder.directory) else {
-                return rockstar_game_to_install(&folder);
+                return rockstar_folder_to_install(folder);
             };
             let canonical = fs::canonicalize(&executable).unwrap_or_else(|_| executable.clone());
             if known_targets.contains(&canonical) {
                 return None;
             }
-            Some(game_from_folder(&folder, &executable))
+            Some(game_from_folder(folder, &executable))
         })
-        .collect()
+        .collect();
+    let owned = owned_rockstar_games(&found, &games);
+    games.extend(owned);
+    games
+}
+
+pub fn rockstar_watched_paths(folders: &[PathBuf]) -> Vec<PathBuf> {
+    rockstar_installs(
+        &folders
+            .iter()
+            .flat_map(|folder| game_folders(folder, 0))
+            .collect::<Vec<_>>(),
+    )
+    .iter()
+    .filter_map(|(_, prefix)| drive_c(prefix))
+    .flat_map(|drive| rockstar::watched_paths(&drive))
+    .collect()
+}
+
+fn rockstar_installs(found: &[GameFolder]) -> Vec<(PathBuf, PathBuf)> {
+    let mut installs: Vec<(PathBuf, PathBuf)> = Vec::new();
+    for folder in found {
+        if let (Some(launcher), Some(prefix)) = (&folder.rockstar_launcher, &folder.wine_prefix)
+            && !installs.iter().any(|(known, _)| known == launcher)
+        {
+            installs.push((launcher.clone(), prefix.clone()));
+        }
+    }
+    installs
+}
+
+fn owned_rockstar_games(found: &[GameFolder], listed: &[Game]) -> Vec<Game> {
+    let mut seen_titles: HashSet<String> = listed.iter().map(|game| compact(&game.title)).collect();
+    let mut games = Vec::new();
+    for (launcher, prefix) in rockstar_installs(found) {
+        let Some(drive) = drive_c(&prefix) else {
+            continue;
+        };
+        for owned in rockstar::owned_titles(&drive) {
+            if seen_titles.insert(compact(owned.title)) {
+                games.push(rockstar_game_to_install(
+                    format!("rockstar:{}", owned.code),
+                    owned.title.to_string(),
+                    &launcher,
+                    &prefix,
+                ));
+            }
+        }
+    }
+    games
 }
 
 fn is_skipped(name: &str, words: &[&str]) -> bool {
@@ -147,18 +200,28 @@ fn is_rockstar(directory: &Path) -> bool {
         .is_some_and(|name| name.to_string_lossy().to_lowercase() == ROCKSTAR_FOLDER)
 }
 
-fn rockstar_game_to_install(folder: &GameFolder) -> Option<Game> {
+fn rockstar_folder_to_install(folder: &GameFolder) -> Option<Game> {
     let launcher = folder.rockstar_launcher.as_deref()?;
+    let prefix = folder.wine_prefix.as_deref()?;
     let name = folder.directory.file_name()?.to_string_lossy().into_owned();
-    let mut game = Game::launched_by_konsol(
+    Some(rockstar_game_to_install(
         format!("folder:{}", folder.directory.display()),
         pretty_title(&name),
+        launcher,
+        prefix,
+    ))
+}
+
+fn rockstar_game_to_install(id: String, title: String, launcher: &Path, prefix: &Path) -> Game {
+    let mut game = Game::launched_by_konsol(
+        id,
+        title,
         GameSource::Rockstar,
         LaunchTarget::Program(launcher.to_path_buf()),
     );
     game.installed = false;
-    game.install_command = Some(launch_command(launcher, folder.wine_prefix.as_deref()));
-    Some(game)
+    game.install_command = Some(launch_command(launcher, Some(prefix)));
+    game
 }
 
 fn is_publisher(directory: &Path) -> bool {

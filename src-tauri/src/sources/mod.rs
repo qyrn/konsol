@@ -1,6 +1,7 @@
 mod desktop;
 mod folders;
 mod heroic;
+mod rockstar;
 mod steam;
 
 pub use folders::default_folders;
@@ -23,7 +24,9 @@ pub fn watched_paths(home: &Path, config: &KonsolConfig) -> Vec<PathBuf> {
         heroic.join("nile_config/nile/installed.json"),
     ];
     paths.extend(steam::watched_paths(home));
-    for folder in game_folders(home, config) {
+    let folders = game_folders(home, config);
+    paths.extend(folders::rockstar_watched_paths(&folders));
+    for folder in folders {
         paths.extend(nested_directories(&folder, 3));
         paths.push(folder);
     }
