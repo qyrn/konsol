@@ -404,7 +404,7 @@ fn launch_command(executable: &Path, wine_prefix: Option<&Path>) -> Vec<String> 
         command.push(format!("WINEPREFIX={}", prefix.display()));
     }
     if which("umu-run") {
-        command.extend(["GAMEID=0".to_string(), "umu-run".to_string()]);
+        command.extend(["GAMEID=umu-default".to_string(), "umu-run".to_string()]);
     } else {
         command.push("wine".to_string());
     }
