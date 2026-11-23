@@ -402,6 +402,9 @@ fn launch_command(executable: &Path, wine_prefix: Option<&Path>) -> Vec<String> 
     let mut command = vec!["env".to_string()];
     if let Some(prefix) = wine_prefix {
         command.push(format!("WINEPREFIX={}", prefix.display()));
+        if let Some(proton) = proton_that_last_ran(prefix) {
+            command.push(format!("PROTONPATH={}", proton.display()));
+        }
     }
     if which("umu-run") {
         command.extend(["GAMEID=umu-default".to_string(), "umu-run".to_string()]);
@@ -410,6 +413,13 @@ fn launch_command(executable: &Path, wine_prefix: Option<&Path>) -> Vec<String> 
     }
     command.push(path);
     command
+}
+
+fn proton_that_last_ran(wine_prefix: &Path) -> Option<PathBuf> {
+    let config_info = fs::read_to_string(wine_prefix.join("config_info")).ok()?;
+    let fonts_directory = config_info.lines().nth(1)?;
+    let proton_root = PathBuf::from(fonts_directory.split_once("/files/")?.0);
+    proton_root.join("proton").is_file().then_some(proton_root)
 }
 
 fn which(program: &str) -> bool {
@@ -530,5 +540,29 @@ mod tests {
             pretty_title("hollow_knight-silksong"),
             "hollow knight silksong"
         );
+    }
+
+    #[test]
+    fn launches_a_prefix_with_the_proton_that_last_ran_it() {
+        let root = std::env::temp_dir().join(format!("konsol-proton-{}", std::process::id()));
+        let proton = root.join("compatibilitytools.d/GE-Proton10-34");
+        let prefix = root.join("prefixes/rockstar");
+        write_executable(&proton.join("proton"), b"#!");
+        fs::create_dir_all(&prefix).unwrap();
+        fs::write(
+            prefix.join("config_info"),
+            format!("GE-Proton10-34\n{}/files/share/fonts/\n", proton.display()),
+        )
+        .unwrap();
+        let command = launch_command(&prefix.join("drive_c/game.exe"), Some(&prefix));
+        assert!(command.contains(&format!("PROTONPATH={}", proton.display())));
+        fs::remove_dir_all(&proton).unwrap();
+        let command = launch_command(&prefix.join("drive_c/game.exe"), Some(&prefix));
+        assert!(
+            !command
+                .iter()
+                .any(|argument| argument.starts_with("PROTONPATH="))
+        );
+        fs::remove_dir_all(&root).unwrap();
     }
 }
